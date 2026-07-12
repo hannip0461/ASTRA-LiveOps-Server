@@ -30,8 +30,8 @@ jobs:
       ASTRA_DEV_TOKEN_KEY: ci-only-development-token-bootstrap-key-2026
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 10.0.x
       - run: dotnet restore Astra.LiveOps.slnx
@@ -92,12 +92,12 @@ jobs:
   deployment-validation:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 10.0.x
-      - uses: azure/setup-helm@v4
-      - uses: hashicorp/setup-terraform@v3
+      - uses: azure/setup-helm@v5
+      - uses: hashicorp/setup-terraform@v4
 
       - name: Pulumi program compiles
         run: dotnet build deploy/pulumi/Astra.LiveOps.Deploy.csproj --configuration Release
@@ -160,13 +160,14 @@ jobs:
             image: astra-liveops-worker
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/login-action@v3
+      - uses: actions/checkout@v7
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/metadata-action@v5
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/metadata-action@v6
         id: metadata
         with:
           images: ghcr.io/hannip0461/${{ matrix.image }}
@@ -176,7 +177,7 @@ jobs:
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.description=ASTRA LiveOps Server ${{ matrix.target }} image
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         with:
           context: .
           target: ${{ matrix.target }}
