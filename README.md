@@ -183,10 +183,10 @@ dotnet build deploy/pulumi/Astra.LiveOps.Deploy.csproj -c Release
 
 ### Docker images
 
-- [`api`](https://github.com/users/hannip0461/packages/container/astra-liveops-api): `ghcr.io/hannip0461/astra-liveops-api:latest`
-- [`admin`](https://github.com/users/hannip0461/packages/container/astra-liveops-admin): `ghcr.io/hannip0461/astra-liveops-admin:latest`
-- [`silo`](https://github.com/users/hannip0461/packages/container/astra-liveops-silo): `ghcr.io/hannip0461/astra-liveops-silo:latest`
-- [`tcp-gateway`](https://github.com/users/hannip0461/packages/container/astra-liveops-tcp-gateway): `ghcr.io/hannip0461/astra-liveops-tcp-gateway:latest`
-- [`worker`](https://github.com/users/hannip0461/packages/container/astra-liveops-worker): `ghcr.io/hannip0461/astra-liveops-worker:latest`
+- [`api`](https://github.com/hannip0461/ASTRA-LiveOps-Server/pkgs/container/astra-liveops-api): `ghcr.io/hannip0461/astra-liveops-api:latest`
+- [`admin`](https://github.com/hannip0461/ASTRA-LiveOps-Server/pkgs/container/astra-liveops-admin): `ghcr.io/hannip0461/astra-liveops-admin:latest`
+- [`silo`](https://github.com/hannip0461/ASTRA-LiveOps-Server/pkgs/container/astra-liveops-silo): `ghcr.io/hannip0461/astra-liveops-silo:latest`
+- [`tcp-gateway`](https://github.com/hannip0461/ASTRA-LiveOps-Server/pkgs/container/astra-liveops-tcp-gateway): `ghcr.io/hannip0461/astra-liveops-tcp-gateway:latest`
+- [`worker`](https://github.com/hannip0461/ASTRA-LiveOps-Server/pkgs/container/astra-liveops-worker): `ghcr.io/hannip0461/astra-liveops-worker:latest`
 
 세부 운영 정책은 `docs/content`, `docs/security`, `docs/api`, `docs/operations`, `docs/persistence`, `docs/tcp`, `docs/deployment`에 정리한다.
