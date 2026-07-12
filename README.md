@@ -1,30 +1,95 @@
 # ASTRA LiveOps Server
 
-트릭컬 리바이브 같은 수집형 RPG의 LiveOps 문제를 기준으로 구현한 .NET 10 / Microsoft Orleans 서버.
+.NET 10과 Microsoft Orleans로 구현한 수집형 RPG LiveOps 서버다. 가챠·재화·천장 처리의 데이터 정합성과 콘텐츠 배포 사고의 추적·복구를 실제 코드, 운영 도구와 장애 테스트로 검증한다.
 
-## 운영 화면
+[![CI](https://github.com/hannip0461/ASTRA-LiveOps-Server/actions/workflows/ci.yml/badge.svg)](https://github.com/hannip0461/ASTRA-LiveOps-Server/actions/workflows/ci.yml)
+
+## 주요 화면
 
 | 콘텐츠 배포와 롤백 | 사고 대상자 보상 |
 |---|---|
 | [![콘텐츠 운영 화면](output/playwright/01-content-ops.png)](output/playwright/01-content-ops.png) | [![사고 보상 화면](output/playwright/02-incident-mail.png)](output/playwright/02-incident-mail.png) |
 | **운영 감사 로그** | **Outbox 운영** |
 | [![감사 로그 화면](output/playwright/03-audit-log.png)](output/playwright/03-audit-log.png) | [![Outbox 운영 화면](output/playwright/04-outbox-operations.png)](output/playwright/04-outbox-operations.png) |
+| **Kibana 관측성** | **운영 상태 Dashboard** |
+| [![Kibana 관측성 화면](output/playwright/astra-observability-dashboard.png)](output/playwright/astra-observability-dashboard.png) | [![운영 상태 화면](output/playwright/astra-operational-dashboard.png)](output/playwright/astra-operational-dashboard.png) |
 
-## 검토 순서
+## 프로젝트 개요
 
-1. [포트폴리오 PDF](docs/portfolio/ASTRA_LiveOps_Portfolio.pdf)에서 문제 정의와 검증 결과를 확인한다.
-2. 아래 `핵심 구현 범위`와 `현재 구현`에서 코드 범위를 확인한다.
-3. `pwsh -File scripts/demo/Run-PortfolioDemo.ps1`로 핵심 시나리오를 재현한다.
-4. [데모 실행 결과](output/demo/portfolio-demo-summary.md)와 [화면 증빙](output/playwright/README.md)을 확인한다.
+수집형 RPG에서는 네트워크 재시도, 동시 명령과 콘텐츠 운영 실수가 재화·보상 오류로 이어질 수 있다. ASTRA는 플레이어별 명령 경계, 원자적 DB transaction과 운영 복구 절차를 하나의 실행 가능한 서버로 구성한다.
 
-## 핵심 구현 범위
+| 영역 | 구현 결과 |
+|---|---|
+| 플레이어 명령 | PlayerAccountGrain 기반 직렬화와 HTTP/TCP 공통 command 처리 |
+| 영속 정합성 | PostgreSQL transaction, ledger, audit와 completed response replay |
+| 운영 복구 | immutable content snapshot, rollback, 영향 대상 snapshot과 Incident Mail |
+| 운영 가시성 | Blazor Admin, Transactional Outbox, OpenTelemetry와 Kibana Dashboard |
+| 검증 | 표준 테스트 91건, PostgreSQL 테스트 17건, 2-Silo 및 HTTP/TCP E2E |
 
-- 가챠, 천장, 재화와 인벤토리의 트랜잭션 정합성
-- 요청 `PENDING` row 없이 완료 결과를 재사용하는 멱등성
-- 사고 영향 대상 snapshot과 대상자 보상 우편
-- Blazor 기반 LiveOps 운영 도구
-- Orleans Grain을 직접 호출하는 TCP + Protobuf Gateway
-- PostgreSQL source of truth와 Redis 조회 가속
+## 핵심 시나리오
+
+### 가챠 정합성
+
+동일한 `Idempotency-Key` 요청은 저장된 응답을 재사용한다. 재화 차감, 보상 지급, 중복 캐릭터 변환, 천장 갱신, 원장, 감사 로그와 Outbox event를 하나의 PostgreSQL transaction에서 commit한다.
+
+### 운영 사고 복구
+
+배포된 콘텐츠의 version과 checksum을 기록한다. 잘못된 설정은 이전 snapshot으로 rollback하고, 영향 대상자를 확정한 뒤 Incident Mail을 통해 중복 없이 보상한다.
+
+## 시스템 구성
+
+| 구성요소 | 책임 |
+|---|---|
+| ASP.NET Core API | 인증, 권한, 입력 검증과 HTTP command 경계 |
+| TCP + Protobuf Gateway | session/framing 검증과 Orleans Grain 직접 호출 |
+| Orleans Silo | 플레이어별 명령 직렬화와 콘텐츠 control plane |
+| PostgreSQL | 상태, 원장, 감사, 멱등 응답, 콘텐츠와 Outbox의 source of truth |
+| Redis | 사고 보상 대상 membership과 짧은 TTL 조회 가속 |
+| Blazor Admin | 콘텐츠 배포·롤백, 사고 보상, 감사와 Outbox 운영 |
+| Worker | Outbox lease/retry/dead-letter와 retention cleanup |
+| OpenTelemetry / Elastic | API, TCP, Grain, DB와 Worker trace·metric·alert |
+
+## 구현 상세
+
+### 상태와 정합성
+
+- PlayerAccountGrain의 플레이어별 command 직렬화
+- 가챠, 재화, inventory, pity와 ledger의 단일 PostgreSQL transaction
+- 요청 hash 검증, completed response 저장과 TTL 기반 idempotency replay
+- commit 전 장애 rollback과 commit 후 응답 장애 replay 테스트
+- hot state와 대용량 cold state 분리
+
+### LiveOps와 사고 복구
+
+- immutable content snapshot과 active version publish/rollback
+- Silo-local ActiveContentCache, PostgreSQL LISTEN/NOTIFY와 주기적 reconciliation
+- 사고 영향 대상 snapshot, Redis membership cache와 PostgreSQL fallback
+- 멱등 Incident Mail claim과 운영 audit trail
+- Blazor 기반 콘텐츠·보상·감사·Outbox 운영 화면
+
+### 통신과 보안
+
+- ASP.NET Core HTTP와 TCP + Protobuf의 공통 command contract
+- TCP framing, signed session binding과 cross-transport replay
+- JWT Bearer RBAC와 외부 OIDC authority 검증
+- Blazor Admin OIDC code flow + PKCE BFF
+- RFC 7807 ProblemDetails, 입력 제한과 actor 단위 rate limit
+
+### 비동기 처리와 관측성
+
+- Transactional Outbox, PostgreSQL lease/retry와 terminal dead-letter
+- 감사된 Supervisor replay와 멱등 operational consumer
+- OTel HTTP/TCP/PostgreSQL trace와 low-cardinality metric
+- PostgreSQL pool saturation, Outbox failure와 alert 재현
+- EDOT -> Elasticsearch -> Kibana Dashboard as Code
+
+### 배포와 검증
+
+- 실제 PostgreSQL을 사용하는 GitHub Actions build/test
+- PostgreSQL ADO.NET membership 기반 2-Silo 검증
+- API, Admin, Silo, TCP Gateway와 Worker의 non-root Docker image
+- Helm resource/probe/PDB/migration hook, Terraform Azure foundation, Pulumi Helm release
+- 동시성, failure injection, hard-kill crash window와 HTTP/TCP E2E 테스트
 
 ## 솔루션 구조
 
@@ -52,87 +117,46 @@ Dockerfile              Multi-target production images
 .github/workflows/ci.yml
 ```
 
-## 로컬 빌드
+## 실행과 검증
+
+<details>
+<summary><b>로컬 빌드와 통합 데모</b></summary>
 
 ```powershell
 dotnet build Astra.LiveOps.slnx
-```
-
-Docker Compose 서비스는 profile 단위로 분리한다. 검증에 필요한 profile만 실행하며 관측성 데이터는 제한된 tmpfs에 저장한다.
-
-## 통합 데모
-
-다음 한 명령으로 가챠 멱등성, 사고 보상, 감사/Outbox와 HTTP/TCP replay 시나리오를 실행한다.
-
-```powershell
 pwsh -File scripts/demo/Run-PortfolioDemo.ps1
 ```
 
-최신 실행 증빙은 `output/demo`에 저장한다. 실행 및 디스크 정책은 `docs/demo/PORTFOLIO_DEMO.md`에 정리한다.
+데모는 가챠 replay, 콘텐츠 사고 대상 snapshot, Incident Mail 보상, audit/Outbox와 HTTP/TCP replay를 검증하고 `output/demo`에 실행 증빙을 남긴다.
 
-## 현재 구현
+</details>
 
-- PlayerAccountGrain 계약과 구현
-- 재화 지급/차감 command processor
-- 요청 `PENDING` row 없는 idempotency replay
-- TTL 내 동일 response envelope replay와 key 재사용 전 lazy cleanup
-- 초기 테스트용 in-memory transaction store
-- PostgreSQL transaction store와 schema
-- immutable content snapshot과 active version 원자적 publish/rollback
-- PostgreSQL LISTEN/NOTIFY 및 주기적 reconciliation으로 동기화하는 Silo-local ActiveContentCache
-- active content version, checksum, 비용과 가중치 보상표를 사용하는 가챠 처리
-- 천장 보장/초기화, 중복 캐릭터 변환, 인벤토리 갱신과 이력을 묶은 단일 transaction
-- Incident Mail 대상 snapshot과 멱등 수령
-- 사고 보상 자격 확인용 Redis membership cache
-- Redis command/connection 장애 시 PostgreSQL fallback
-- Incident Mail 생성, 대상 확인과 claim replay를 지원하는 Blazor Admin
-- TCP + Protobuf v1 framing, 서명된 session binding과 Orleans Grain 직접 호출
-- 동일 request hash와 idempotency key를 사용하는 HTTP/TCP 교차 replay
-- 로컬 HMAC 개발 토큰과 외부 OIDC authority를 지원하는 JWT Bearer LiveOps RBAC
-- OIDC code flow + PKCE BFF와 서버 측 API access token session
-- 인증된 작업자와 intent-first lifecycle을 기록하는 PostgreSQL 운영 감사
-- RFC 7807 ProblemDetails, 입력 제한 검증과 actor 단위 역할별 rate limit
-- Transactional Outbox와 PostgreSQL lease/retry Worker
-- projection 정제, terminal dead-letter와 감사된 Supervisor replay를 지원하는 멱등 consumer
-- 만료된 published event와 delivery projection을 원자적으로 제거하는 retention cleanup
-- grace period, `SKIP LOCKED` batch와 query timeout을 적용한 만료 idempotency 정리
-- 서비스별 PostgreSQL pool budget, wait/command timeout과 포화 회복 테스트
-- payload와 idempotency key를 노출하지 않는 Blazor Outbox 운영 화면
-- OTel HTTP/TCP/PostgreSQL trace, Npgsql pool metric과 connection 획득 metric
-- PostgreSQL 포화 burn rate와 Outbox publish/retry/dead-letter 장애 증빙
-- low-cardinality outcome 기반 TCP 요청 수와 응답 완료 latency metric
-- profile 기반 EDOT -> Elasticsearch -> Kibana pipeline, Dashboard as Code와 alert probe
-- API, Silo와 Worker의 OpenTelemetry console/OTLP exporter
-- PostgreSQL Outbox event부터 published 상태까지의 Worker E2E 검증
-- consumer commit과 Outbox publish 사이 crash window의 OS hard-kill 복구 테스트
-- 재화와 멱등성의 동시성/장애 테스트
-- 가챠 차감 이후 오류가 부분 상태를 남기지 않는 failure injection
-- 실제 PostgreSQL service를 사용하는 GitHub Actions build/test
-- 고정된 upstream schema migration 기반 PostgreSQL Orleans ADO.NET membership
-- 2-Silo membership과 HTTP/TCP Grain RPC 검증
-- API, Admin, Silo, TCP Gateway와 Worker의 non-root multi-target Docker image
-- resource limit, probe, Secret reference, PDB와 migration hook을 포함한 Helm chart
-- private AKS, ACR, VNet, Log Analytics와 PostgreSQL을 정의하는 Terraform
-- Helm application release만 소유하는 Pulumi C# program
-- Docker, Helm, Terraform과 Pulumi의 GitHub Actions 배포 구성 검증
+<details>
+<summary><b>PostgreSQL 통합 검증</b></summary>
 
-`InMemory` 저장소는 단일 Silo 개발과 단위 테스트에만 사용한다. Multi-Silo 실행 경로는 PostgreSQL mode다.
-콘텐츠 lifecycle과 장애 동작은 `docs/content/CONTENT_LIFECYCLE.md`에 정리한다.
-LiveOps 인증, route 권한과 감사 정책은 `docs/security/LIVEOPS_AUTH_AUDIT.md`에 정리한다.
-HTTP 오류, 검증과 요청 제한 contract는 `docs/api/API_BOUNDARY.md`에 정리한다.
-Outbox 전달, crash recovery, dead-letter와 replay 정책은 `docs/operations/OUTBOX_DELIVERY.md`에 정리한다.
-영속 데이터 TTL과 DB 부하 제한은 `docs/persistence/RETENTION.md`에 정리한다.
-PostgreSQL pool budget, SLO와 alert 기준은 `docs/operations/POSTGRES_POOL_SLO.md`에 정리한다.
-Elastic/EDOT 실행 범위와 E2E 검증은 `docs/operations/OBSERVABILITY.md`에 정리한다.
-Container, Kubernetes, Terraform, Pulumi와 배포 책임은 `docs/deployment/DEPLOYMENT.md`에 정리한다.
+```powershell
+docker compose -f deploy/docker-compose.yml --profile core up -d postgres
+$env:ASTRA_RUN_POSTGRES_TESTS='1'
+dotnet test tests/Astra.IntegrationTests/Astra.IntegrationTests.csproj --filter Postgres
+docker compose -f deploy/docker-compose.yml stop postgres
+```
 
-## 관측성 화면
+</details>
 
-| Kibana 관측성 Dashboard | 운영 상태 Dashboard |
-|---|---|
-| [![Kibana 관측성 화면](output/playwright/astra-observability-dashboard.png)](output/playwright/astra-observability-dashboard.png) | [![운영 상태 화면](output/playwright/astra-operational-dashboard.png)](output/playwright/astra-operational-dashboard.png) |
+<details>
+<summary><b>TCP Gateway E2E</b></summary>
 
-## 배포 구성 검증
+`Astra.Silo`, `Astra.Api`, `Astra.TcpGateway`를 실행한 뒤 테스트한다.
+
+```powershell
+$env:ASTRA_RUN_TCP_E2E='1'
+dotnet test tests/Astra.IntegrationTests/Astra.IntegrationTests.csproj --filter TcpGatewayEndToEndTests
+```
+
+</details>
+
+<details>
+<summary><b>배포 구성 검증</b></summary>
 
 ```powershell
 docker build --check --target api .
@@ -143,31 +167,26 @@ terraform -chdir=deploy/terraform validate
 dotnet build deploy/pulumi/Astra.LiveOps.Deploy.csproj -c Release
 ```
 
-CI는 Docker target 5개를 모두 build한다. 로컬에서는 Docker Desktop 디스크 증가를 막기 위해 기본적으로 `docker build --check`를 사용한다.
+</details>
 
-## PostgreSQL 통합 검증
+## 산출물 모음
 
-PostgreSQL만 내려받아 실행한다. 이 검증에서는 observability profile을 활성화하지 않는다.
+| 산출물 | 내용 |
+|---|---|
+| [프로젝트 종합 문서](docs/portfolio/ASTRA_LiveOps_Portfolio.pdf) | 문제 정의, 설계 결정, 파이프라인과 검증 결과 |
+| [아키텍처 도식 모음](docs/portfolio/ASTRA_LiveOps_Architecture_Diagrams.pdf) | 런타임, transaction, 콘텐츠, 복구, Outbox와 배포 흐름 |
+| [통합 데모 결과](output/demo/portfolio-demo-summary.md) | 실행 시나리오와 검증 결과 요약 |
+| [데모 증빙 JSON](output/demo/portfolio-demo-evidence.json) | 자동 검증 가능한 실행 결과 |
+| [운영 화면 원본](output/playwright/README.md) | Admin 및 Kibana 화면 6종 |
+| [GitHub Actions CI](https://github.com/hannip0461/ASTRA-LiveOps-Server/actions/workflows/ci.yml) | build, test, E2E, IaC 검증과 Docker image 발행 |
+| [GHCR Docker images](https://github.com/hannip0461?tab=packages) | API, Admin, Silo, TCP Gateway, Worker image |
 
-```powershell
-docker compose -f deploy/docker-compose.yml --profile core up -d postgres
-$env:ASTRA_RUN_POSTGRES_TESTS='1'
-dotnet test tests/Astra.IntegrationTests/Astra.IntegrationTests.csproj --filter Postgres
-```
+### Docker images
 
-Named volume을 삭제하지 않고 container만 중지한다.
+- [`api`](https://github.com/users/hannip0461/packages/container/astra-liveops-api): `ghcr.io/hannip0461/astra-liveops-api:latest`
+- [`admin`](https://github.com/users/hannip0461/packages/container/astra-liveops-admin): `ghcr.io/hannip0461/astra-liveops-admin:latest`
+- [`silo`](https://github.com/users/hannip0461/packages/container/astra-liveops-silo): `ghcr.io/hannip0461/astra-liveops-silo:latest`
+- [`tcp-gateway`](https://github.com/users/hannip0461/packages/container/astra-liveops-tcp-gateway): `ghcr.io/hannip0461/astra-liveops-tcp-gateway:latest`
+- [`worker`](https://github.com/users/hannip0461/packages/container/astra-liveops-worker): `ghcr.io/hannip0461/astra-liveops-worker:latest`
 
-```powershell
-docker compose -f deploy/docker-compose.yml stop postgres
-```
-
-## TCP Gateway E2E 검증
-
-`Astra.Silo`, `Astra.Api`, `Astra.TcpGateway`를 실행한 뒤 테스트한다.
-
-```powershell
-$env:ASTRA_RUN_TCP_E2E='1'
-dotnet test tests/Astra.IntegrationTests/Astra.IntegrationTests.csproj --filter TcpGatewayEndToEndTests
-```
-
-테스트는 HTTP로 콘텐츠와 플레이어 상태를 준비하고 TCP 가챠, 재연결, 동일 idempotency key replay와 HTTP/TCP wallet 일치를 검증한다. Wire protocol은 `docs/tcp/PROTOCOL.md`에 정리한다.
+세부 운영 정책은 `docs/content`, `docs/security`, `docs/api`, `docs/operations`, `docs/persistence`, `docs/tcp`, `docs/deployment`에 정리한다.
