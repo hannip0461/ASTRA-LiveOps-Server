@@ -62,7 +62,7 @@
   "tcp": {
     "crossTransportReplayVerified": true,
     "skipped": false,
-    "log": "C:\\Users\\kimmj\\Documents\\Codex\\2026-07-06\\new-chat-2\\astra-liveops\\output\\demo\\portfolio-demo-tcp-e2e.log"
+    "log": "output/demo/portfolio-demo-tcp-e2e.log"
   },
   "checks": {
     "contentPublishAndActivation": true,

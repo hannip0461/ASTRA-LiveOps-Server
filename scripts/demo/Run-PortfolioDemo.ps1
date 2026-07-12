@@ -512,7 +512,7 @@ $evidence = [ordered]@{
     tcp = [ordered]@{
         crossTransportReplayVerified = $tcpVerified
         skipped = [bool]$SkipTcpVerification
-        log = if ($SkipTcpVerification) { $null } else { $tcpLogPath }
+        log = if ($SkipTcpVerification) { $null } else { 'output/demo/portfolio-demo-tcp-e2e.log' }
     }
     checks = [ordered]@{
         contentPublishAndActivation = $true
