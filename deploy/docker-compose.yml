@@ -1,0 +1,130 @@
+name: astra-liveops
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: astra-postgres
+    profiles: ["core"]
+    environment:
+      POSTGRES_DB: astra
+      POSTGRES_USER: astra
+      POSTGRES_PASSWORD: astra_dev_password
+    ports:
+      - "54329:5432"
+    volumes:
+      - astra_pgdata:/var/lib/postgresql/data
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  redis:
+    image: redis:8-alpine
+    container_name: astra-redis
+    profiles: ["core"]
+    command: ["redis-server", "--appendonly", "no", "--save", ""]
+    ports:
+      - "6389:6379"
+    volumes:
+      - astra_redisdata:/data
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.4.2
+    container_name: astra-elasticsearch
+    profiles: ["observability"]
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      xpack.license.self_generated.type: basic
+      xpack.ml.enabled: "false"
+      ingest.geoip.downloader.enabled: "false"
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    ports:
+      - "127.0.0.1:9209:9200"
+    mem_limit: 1280m
+    tmpfs:
+      - /usr/share/elasticsearch/data:size=1g,uid=1000,gid=0,mode=0770
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9200/_cluster/health >/dev/null || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:9.4.2
+    container_name: astra-kibana
+    profiles: ["observability"]
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+      XPACK_SECURITY_ENABLED: "false"
+      XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY: astra-local-saved-objects-key-2026-07-12
+      XPACK_REPORTING_ENCRYPTIONKEY: astra-local-reporting-key-2026-07-12-000
+      XPACK_SECURITY_ENCRYPTIONKEY: astra-local-security-key-2026-07-12-0000
+      TELEMETRY_OPTIN: "false"
+      TELEMETRY_ALLOWCHANGINGOPTINSTATUS: "false"
+      NEWSFEED_ENABLED: "false"
+    ports:
+      - "127.0.0.1:5609:5601"
+    mem_limit: 1024m
+    tmpfs:
+      - /usr/share/kibana/data:size=128m,uid=1000,gid=0,mode=0770
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:5601/api/status >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 45s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  edot-collector:
+    image: elastic/elastic-agent:9.4.2
+    container_name: astra-edot-collector
+    profiles: ["observability"]
+    environment:
+      ELASTIC_AGENT_OTEL: "true"
+      ELASTIC_ENDPOINT: http://elasticsearch:9200
+    command: ["--config", "/etc/otelcol/config.yml"]
+    ports:
+      - "127.0.0.1:4317:4317"
+      - "127.0.0.1:4318:4318"
+      - "127.0.0.1:13133:13133"
+    mem_limit: 384m
+    volumes:
+      - ./observability/otel-collector.yml:/etc/otelcol/config.yml:ro
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:13133/ >/dev/null || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  astra_pgdata:
+  astra_redisdata:

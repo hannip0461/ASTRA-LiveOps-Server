@@ -1,0 +1,331 @@
+@page "/content"
+@rendermode InteractiveServer
+@using Astra.Admin.Services
+@using Astra.Contracts
+@attribute [Authorize]
+@inject ContentAdminApiClient ApiClient
+
+<PageTitle>Content Ops</PageTitle>
+
+<section class="ops-header">
+    <div>
+        <p class="eyebrow">LiveOps Content</p>
+        <h1>Content publish and rollback</h1>
+        <p class="muted">Publish one active gacha banner snapshot, verify checksum, and rollback to a known version.</p>
+    </div>
+    <button class="btn btn-outline-secondary" @onclick="LoadActiveAsync" disabled="@busy">Refresh</button>
+</section>
+
+<section class="ops-grid">
+    <div class="ops-panel">
+        <div class="panel-heading">
+            <h2>Active Snapshot</h2>
+            <span class="status @(active is null ? "status-empty" : "status-live")">@(active is null ? "Empty" : "Live")</span>
+        </div>
+
+        @if (active is null)
+        {
+            <p class="muted">No active content snapshot has been published.</p>
+        }
+        else
+        {
+            <dl class="snapshot-list">
+                <dt>Version</dt>
+                <dd>@active.Version</dd>
+                <dt>Checksum</dt>
+                <dd class="mono">@active.Checksum</dd>
+                <dt>Published</dt>
+                <dd>@active.PublishedAtUtc.ToString("u")</dd>
+                <dt>Banners</dt>
+                <dd>@active.GachaBanners.Count</dd>
+            </dl>
+
+            <table class="ops-table">
+                <thead>
+                    <tr>
+                        <th>Banner</th>
+                        <th>Cost</th>
+                        <th>Pity</th>
+                        <th>Pool</th>
+                        <th>Window</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var banner in active.GachaBanners)
+                    {
+                        <tr>
+                            <td>@banner.BannerId</td>
+                            <td>@banner.CostAmount @banner.CostCurrency</td>
+                            <td>@banner.PityThreshold</td>
+                            <td>@banner.RewardPool.Count rewards / @banner.RewardPool.Sum(entry => entry.Weight) weight</td>
+                            <td>@banner.StartsAtUtc.ToString("MM-dd HH:mm") - @banner.EndsAtUtc.ToString("MM-dd HH:mm") UTC</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+
+    <div class="ops-panel">
+        <div class="panel-heading">
+            <h2>Publish Draft</h2>
+            <span class="status status-draft">Draft</span>
+        </div>
+
+        <div class="form-grid">
+            <label>
+                Version
+                <input class="form-control" @bind="draft.Version" />
+            </label>
+            <label>
+                Banner ID
+                <input class="form-control" @bind="draft.BannerId" />
+            </label>
+            <label>
+                Cost
+                <input class="form-control" type="number" @bind="draft.CostAmount" />
+            </label>
+            <label>
+                Pity
+                <input class="form-control" type="number" @bind="draft.PityThreshold" />
+            </label>
+            <label>
+                Standard character
+                <input class="form-control" @bind="draft.StandardCharacterId" />
+            </label>
+            <label>
+                Standard weight
+                <input class="form-control" type="number" @bind="draft.StandardWeight" />
+            </label>
+            <label>
+                Pickup character
+                <input class="form-control" @bind="draft.PickupCharacterId" />
+            </label>
+            <label>
+                Pickup weight
+                <input class="form-control" type="number" @bind="draft.PickupWeight" />
+            </label>
+            <label>
+                Starts UTC
+                <input class="form-control" @bind="draft.StartsAtUtc" />
+            </label>
+            <label>
+                Ends UTC
+                <input class="form-control" @bind="draft.EndsAtUtc" />
+            </label>
+        </div>
+
+        <label class="block-label">
+            Operation reason
+            <input class="form-control" @bind="draft.Reason" />
+        </label>
+
+        <div class="button-row">
+            <AuthorizeView Roles="LiveOpsOperator,LiveOpsSupervisor">
+                <button class="btn btn-primary" @onclick="PublishAsync" disabled="@busy">Publish</button>
+            </AuthorizeView>
+            <button class="btn btn-outline-secondary" @onclick="ResetDraft" disabled="@busy">Reset</button>
+        </div>
+    </div>
+</section>
+
+<section class="ops-panel">
+    <div class="panel-heading">
+        <h2>Rollback</h2>
+        <span class="status status-warning">Control plane</span>
+    </div>
+    <div class="rollback-row">
+        <input class="form-control" placeholder="version to rollback" @bind="rollbackVersion" />
+        <input class="form-control" placeholder="rollback reason" @bind="rollbackReason" />
+        <AuthorizeView Roles="LiveOpsSupervisor">
+            <button class="btn btn-outline-danger" @onclick="RollbackAsync" disabled="@busy">Rollback</button>
+        </AuthorizeView>
+    </div>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(message))
+{
+    <section class="result @(lastResult?.Published == false ? "result-error" : "result-ok")">
+        <strong>@message</strong>
+        @if (lastResult?.Issues.Count > 0)
+        {
+            <ul>
+                @foreach (var issue in lastResult.Issues)
+                {
+                    <li><span class="mono">@issue.Code</span> @issue.Message</li>
+                }
+            </ul>
+        }
+    </section>
+}
+
+@code {
+    private ContentSnapshotDto? active;
+    private ContentPublishResult? lastResult;
+    private bool busy;
+    private string? message;
+    private string rollbackVersion = "";
+    private string rollbackReason = "incident-response";
+    private DraftContentModel draft = DraftContentModel.CreateDefault();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadActiveAsync();
+    }
+
+    private async Task LoadActiveAsync()
+    {
+        await RunAsync(async () =>
+        {
+            active = await ApiClient.GetActiveAsync();
+            message = active is null ? "No active snapshot." : $"Loaded active version {active.Version}.";
+        });
+    }
+
+    private async Task PublishAsync()
+    {
+        await RunAsync(async () =>
+        {
+            if (!TryBuildPublishCommand(out var command, out var error))
+            {
+                lastResult = new ContentPublishResult(false, null, [new ContentValidationIssue("admin.form.invalid", error)]);
+                message = "Draft is invalid.";
+                return;
+            }
+
+            lastResult = await ApiClient.PublishAsync(command);
+            active = lastResult.Snapshot ?? active;
+            message = lastResult.Published ? $"Published {lastResult.Snapshot!.Version}." : "Publish rejected.";
+        });
+    }
+
+    private async Task RollbackAsync()
+    {
+        await RunAsync(async () =>
+        {
+            lastResult = await ApiClient.RollbackAsync(rollbackVersion, rollbackReason);
+            active = lastResult.Snapshot ?? active;
+            message = lastResult.Published ? $"Rolled back to {lastResult.Snapshot!.Version}." : "Rollback rejected.";
+        });
+    }
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        busy = true;
+        message = null;
+        try
+        {
+            await action();
+        }
+        catch (HttpRequestException ex)
+        {
+            lastResult = new ContentPublishResult(false, null, [new ContentValidationIssue("api.unreachable", ex.Message)]);
+            message = "API request failed.";
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private bool TryBuildPublishCommand(out PublishContentCommand command, out string error)
+    {
+        command = new PublishContentCommand("", []);
+        error = "";
+
+        if (!DateTimeOffset.TryParse(draft.StartsAtUtc, out var startsAt))
+        {
+            error = "Starts UTC is not a valid timestamp.";
+            return false;
+        }
+
+        if (!DateTimeOffset.TryParse(draft.EndsAtUtc, out var endsAt))
+        {
+            error = "Ends UTC is not a valid timestamp.";
+            return false;
+        }
+
+        command = new PublishContentCommand(
+            draft.Version,
+            [new GachaBannerConfigDto(
+                draft.BannerId,
+                CurrencyCode.Elif,
+                draft.CostAmount,
+                draft.PityThreshold,
+                startsAt.ToUniversalTime(),
+                endsAt.ToUniversalTime(),
+                [
+                    new GachaRewardPoolEntryDto(
+                        GachaRewardKind.Character,
+                        draft.StandardCharacterId,
+                        1,
+                        2,
+                        draft.StandardWeight,
+                        false,
+                        $"memory-{draft.StandardCharacterId}",
+                        5),
+                    new GachaRewardPoolEntryDto(
+                        GachaRewardKind.Character,
+                        draft.PickupCharacterId,
+                        1,
+                        3,
+                        draft.PickupWeight,
+                        true,
+                        $"memory-{draft.PickupCharacterId}",
+                        20)
+                ])],
+            draft.Reason);
+        return true;
+    }
+
+    private void ResetDraft()
+    {
+        draft = DraftContentModel.CreateDefault();
+        message = null;
+        lastResult = null;
+    }
+
+    private sealed class DraftContentModel
+    {
+        public string Version { get; set; } = "";
+
+        public string BannerId { get; set; } = "";
+
+        public long CostAmount { get; set; }
+
+        public int PityThreshold { get; set; }
+
+        public string StandardCharacterId { get; set; } = "";
+
+        public int StandardWeight { get; set; }
+
+        public string PickupCharacterId { get; set; } = "";
+
+        public int PickupWeight { get; set; }
+
+        public string StartsAtUtc { get; set; } = "";
+
+        public string EndsAtUtc { get; set; } = "";
+
+        public string Reason { get; set; } = "";
+
+        public static DraftContentModel CreateDefault()
+        {
+            var now = DateTimeOffset.UtcNow;
+            return new DraftContentModel
+            {
+                Version = $"content-{now:yyyyMMdd-HHmm}",
+                BannerId = "pickup-a",
+                CostAmount = 100,
+                PityThreshold = 90,
+                StandardCharacterId = "char-standard-a",
+                StandardWeight = 9700,
+                PickupCharacterId = "char-pickup-a",
+                PickupWeight = 300,
+                StartsAtUtc = now.AddMinutes(-5).ToString("u"),
+                EndsAtUtc = now.AddDays(7).ToString("u"),
+                Reason = "scheduled-content-publish"
+            };
+        }
+    }
+}

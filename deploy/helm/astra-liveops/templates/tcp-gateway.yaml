@@ -1,0 +1,91 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "astra.fullname" . }}-tcp-gateway
+  labels:
+    {{- include "astra.labels" . | nindent 4 }}
+    app.kubernetes.io/component: tcp-gateway
+spec:
+  replicas: {{ .Values.components.tcpGateway.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "astra.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: tcp-gateway
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "astra.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: tcp-gateway
+      annotations:
+        checksum/runtime: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        {{- include "astra.podSecurityContext" . | nindent 8 }}
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: tcp-gateway
+          image: "{{ .Values.components.tcpGateway.image.repository }}:{{ .Values.components.tcpGateway.image.tag }}"
+          imagePullPolicy: {{ .Values.components.tcpGateway.image.pullPolicy }}
+          securityContext:
+            {{- include "astra.containerSecurityContext" . | nindent 12 }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "astra.fullname" . }}-runtime
+          env:
+            - name: DOTNET_ENVIRONMENT
+              value: Production
+            - name: ConnectionStrings__Orleans
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.existingSecret }}
+                  key: {{ .Values.global.orleansConnectionStringKey }}
+            - name: Astra__TcpSessionToken__SigningKey
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.existingSecret }}
+                  key: {{ .Values.global.tcpSigningKeyKey }}
+          ports:
+            - name: tcp
+              containerPort: 5300
+          readinessProbe:
+            tcpSocket:
+              port: tcp
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: tcp
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.components.tcpGateway.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "astra.fullname" . }}-tcp-gateway
+  labels:
+    {{- include "astra.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.components.tcpGateway.service.type }}
+  selector:
+    app.kubernetes.io/name: {{ include "astra.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: tcp-gateway
+  ports:
+    - name: tcp
+      port: {{ .Values.components.tcpGateway.service.port }}
+      targetPort: tcp

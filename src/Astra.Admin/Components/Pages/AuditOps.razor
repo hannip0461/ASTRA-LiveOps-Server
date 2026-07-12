@@ -1,0 +1,157 @@
+@page "/audit"
+@rendermode InteractiveServer
+@using System.Text.Json
+@using Astra.Admin.Services
+@using Astra.Contracts
+@attribute [Authorize]
+@inject AuditAdminApiClient ApiClient
+
+<PageTitle>Audit Log</PageTitle>
+
+<section class="ops-header">
+    <div>
+        <p class="eyebrow">LiveOps Governance</p>
+        <h1>Operation audit log</h1>
+        <p class="muted">Review authenticated control-plane changes and incomplete operations.</p>
+    </div>
+    <div class="audit-controls">
+        <select class="form-control" @bind="statusFilter">
+            <option value="">All statuses</option>
+            @foreach (var status in Enum.GetValues<OperationAuditStatus>())
+            {
+                <option value="@status">@status</option>
+            }
+        </select>
+        <button class="btn btn-outline-secondary" @onclick="LoadAsync" disabled="@busy">Refresh</button>
+    </div>
+</section>
+
+<section class="ops-panel">
+    <div class="panel-heading">
+        <h2>Recent Operations</h2>
+        <span class="status status-draft">@FilteredEntries.Count records</span>
+    </div>
+
+    @if (entries.Count == 0)
+    {
+        <p class="muted">No operation audit records found.</p>
+    }
+    else
+    {
+        <div class="table-scroll">
+            <table class="ops-table audit-table">
+                <thead>
+                    <tr>
+                        <th>Started</th>
+                        <th>Status</th>
+                        <th>Actor</th>
+                        <th>Action</th>
+                        <th>Target</th>
+                        <th>Reason</th>
+                        <th>Correlation</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var entry in FilteredEntries)
+                    {
+                        <tr>
+                            <td>@entry.StartedAtUtc.ToString("MM-dd HH:mm:ss")</td>
+                            <td><span class="status @StatusClass(entry.Status)">@entry.Status</span></td>
+                            <td>
+                                <strong>@entry.ActorDisplayName</strong>
+                                <div class="muted mono">@entry.ActorId</div>
+                                <div class="muted">@entry.ActorRole</div>
+                            </td>
+                            <td class="mono">@entry.Action</td>
+                            <td>
+                                <strong>@entry.TargetType</strong>
+                                <div class="mono">@entry.TargetId</div>
+                            </td>
+                            <td>
+                                @entry.Reason
+                                <details>
+                                    <summary>Details</summary>
+                                    <pre class="audit-json">@FormatDetails(entry)</pre>
+                                </details>
+                            </td>
+                            <td class="mono">@entry.CorrelationId</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+@if (!string.IsNullOrWhiteSpace(error))
+{
+    <section class="result result-error"><strong>@error</strong></section>
+}
+
+@code {
+    private IReadOnlyList<OperationAuditDto> entries = [];
+    private bool busy;
+    private string statusFilter = "";
+    private string? error;
+
+    private IReadOnlyList<OperationAuditDto> FilteredEntries =>
+        string.IsNullOrWhiteSpace(statusFilter) ||
+        !Enum.TryParse<OperationAuditStatus>(statusFilter, out var status)
+            ? entries
+            : entries.Where(entry => entry.Status == status).ToArray();
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        busy = true;
+        error = null;
+        try
+        {
+            entries = await ApiClient.GetRecentAsync();
+        }
+        catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException)
+        {
+            error = exception.Message;
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private static string StatusClass(OperationAuditStatus status) => status switch
+    {
+        OperationAuditStatus.Succeeded => "status-live",
+        OperationAuditStatus.Started => "status-warning",
+        OperationAuditStatus.Rejected => "status-warning",
+        _ => "status-error"
+    };
+
+    private static string FormatDetails(OperationAuditDto entry)
+    {
+        var details = new
+        {
+            request = ParseJson(entry.RequestSummary),
+            result = ParseJson(entry.ResultSummary),
+            entry.ErrorCode,
+            entry.SourceIp,
+            entry.CompletedAtUtc
+        };
+        return JsonSerializer.Serialize(details, new JsonSerializerOptions(JsonSerializerDefaults.Web)
+        {
+            WriteIndented = true
+        });
+    }
+
+    private static JsonElement? ParseJson(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        using var document = JsonDocument.Parse(value);
+        return document.RootElement.Clone();
+    }
+}

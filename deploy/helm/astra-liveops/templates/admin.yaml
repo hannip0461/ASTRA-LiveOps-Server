@@ -1,0 +1,105 @@
+{{- if .Values.components.admin.enabled }}
+{{- if and .Values.components.admin.auth.openIdConnect.enabled (gt (int .Values.components.admin.replicas) 1) }}
+{{- fail "OIDC Admin currently requires components.admin.replicas=1 because API tokens are held in the pod-local BFF session store" }}
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "astra.fullname" . }}-admin
+  labels:
+    {{- include "astra.labels" . | nindent 4 }}
+    app.kubernetes.io/component: admin
+spec:
+  replicas: {{ .Values.components.admin.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "astra.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: admin
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "astra.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: admin
+    spec:
+      securityContext:
+        {{- include "astra.podSecurityContext" . | nindent 8 }}
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: admin
+          image: "{{ .Values.components.admin.image.repository }}:{{ .Values.components.admin.image.tag }}"
+          imagePullPolicy: {{ .Values.components.admin.image.pullPolicy }}
+          securityContext:
+            {{- include "astra.containerSecurityContext" . | nindent 12 }}
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: Production
+            - name: Astra__ApiBaseUrl
+              value: "http://{{ include "astra.fullname" . }}-api:{{ .Values.components.api.service.port }}"
+            {{- if .Values.components.admin.auth.openIdConnect.enabled }}
+            - name: Astra__UiAuth__OpenIdConnect__Enabled
+              value: "true"
+            - name: Astra__UiAuth__OpenIdConnect__Authority
+              value: {{ required "components.admin.auth.openIdConnect.authority is required" .Values.components.admin.auth.openIdConnect.authority | quote }}
+            - name: Astra__UiAuth__OpenIdConnect__ClientId
+              value: {{ required "components.admin.auth.openIdConnect.clientId is required" .Values.components.admin.auth.openIdConnect.clientId | quote }}
+            - name: Astra__UiAuth__OpenIdConnect__ClientSecret
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.existingSecret }}
+                  key: {{ .Values.components.admin.auth.openIdConnect.clientSecretKey }}
+            - name: Astra__UiAuth__OpenIdConnect__PublicOrigin
+              value: {{ required "components.admin.auth.openIdConnect.publicOrigin is required" .Values.components.admin.auth.openIdConnect.publicOrigin | quote }}
+            - name: Astra__UiAuth__OpenIdConnect__ApiScope
+              value: {{ required "components.admin.auth.openIdConnect.apiScope is required" .Values.components.admin.auth.openIdConnect.apiScope | quote }}
+            - name: Astra__UiAuth__OpenIdConnect__RequireHttpsMetadata
+              value: {{ .Values.components.admin.auth.openIdConnect.requireHttpsMetadata | quote }}
+            - name: Astra__UiAuth__OpenIdConnect__NameClaimType
+              value: {{ .Values.components.admin.auth.openIdConnect.nameClaimType | quote }}
+            - name: Astra__UiAuth__OpenIdConnect__RoleClaimType
+              value: {{ .Values.components.admin.auth.openIdConnect.roleClaimType | quote }}
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.components.admin.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "astra.fullname" . }}-admin
+  labels:
+    {{- include "astra.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.components.admin.service.type }}
+  selector:
+    app.kubernetes.io/name: {{ include "astra.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: admin
+  ports:
+    - name: http
+      port: {{ .Values.components.admin.service.port }}
+      targetPort: http
+{{- end }}

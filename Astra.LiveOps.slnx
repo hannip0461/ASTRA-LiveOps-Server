@@ -1,0 +1,20 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Astra.Admin/Astra.Admin.csproj" />
+    <Project Path="src/Astra.Api/Astra.Api.csproj" />
+    <Project Path="src/Astra.Contracts/Astra.Contracts.csproj" />
+    <Project Path="src/Astra.Domain/Astra.Domain.csproj" />
+    <Project Path="src/Astra.Infrastructure/Astra.Infrastructure.csproj" />
+    <Project Path="src/Astra.Silo/Astra.Silo.csproj" />
+    <Project Path="src/Astra.TcpGateway/Astra.TcpGateway.csproj" />
+    <Project Path="src/Astra.Worker/Astra.Worker.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Astra.ConcurrencyTests/Astra.ConcurrencyTests.csproj" />
+    <Project Path="tests/Astra.FailureTests/Astra.FailureTests.csproj" />
+    <Project Path="tests/Astra.IntegrationTests/Astra.IntegrationTests.csproj" />
+    <Project Path="tests/Astra.ObservabilityProbe/Astra.ObservabilityProbe.csproj" />
+    <Project Path="tests/Astra.UnitTests/Astra.UnitTests.csproj" />
+    <Project Path="tests/Astra.WorkerCrashHarness/Astra.WorkerCrashHarness.csproj" />
+  </Folder>
+</Solution>

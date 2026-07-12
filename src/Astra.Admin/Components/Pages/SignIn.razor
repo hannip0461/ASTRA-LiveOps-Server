@@ -1,0 +1,70 @@
+@page "/sign-in"
+@attribute [AllowAnonymous]
+@layout AuthLayout
+@using Astra.Admin.Services
+@using Microsoft.AspNetCore.WebUtilities
+@inject AdminUiAuthOptions Options
+
+<PageTitle>ASTRA Admin Sign In</PageTitle>
+
+<main class="sign-in-shell">
+    <section class="sign-in-panel">
+        <p class="eyebrow">ASTRA LiveOps</p>
+        <h1>Operator sign in</h1>
+
+        @if (Options.OpenIdConnect.Enabled)
+        {
+            <div class="sign-in-options">
+                <a class="btn btn-primary sign-in-button" href="@ExternalSignInUrl">
+                    <strong>Continue with SSO</strong>
+                </a>
+            </div>
+        }
+        else if (Options.DevSignInEnabled)
+        {
+            <div class="sign-in-options">
+                @foreach (var operatorId in Options.DevOperatorIds)
+                {
+                    <form method="post" action="/auth/dev-sign-in">
+                        <AntiforgeryToken />
+                        <input type="hidden" name="operatorId" value="@operatorId" />
+                        <input type="hidden" name="returnUrl" value="@ReturnUrl" />
+                        <button class="btn btn-outline-secondary sign-in-button" type="submit">
+                            <strong>@OperatorLabel(operatorId)</strong>
+                            <span class="mono">@operatorId</span>
+                        </button>
+                    </form>
+                }
+            </div>
+        }
+        else
+        {
+            <p class="muted">No identity provider is configured.</p>
+        }
+    </section>
+</main>
+
+@code {
+    [SupplyParameterFromQuery]
+    public string ReturnUrl { get; set; } = "/";
+
+    private string ExternalSignInUrl => QueryHelpers.AddQueryString(
+        "/auth/sign-in",
+        "returnUrl",
+        LocalReturnUrl(ReturnUrl));
+
+    private static string LocalReturnUrl(string value) =>
+        value.StartsWith("/", StringComparison.Ordinal) &&
+        !value.StartsWith("//", StringComparison.Ordinal) &&
+        !value.StartsWith("/\\", StringComparison.Ordinal)
+            ? value
+            : "/";
+
+    private static string OperatorLabel(string operatorId) => operatorId switch
+    {
+        "local-viewer" => "Viewer",
+        "local-operator" => "Operator",
+        "local-supervisor" => "Supervisor",
+        _ => operatorId
+    };
+}

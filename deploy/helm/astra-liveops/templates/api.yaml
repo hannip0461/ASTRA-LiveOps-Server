@@ -1,0 +1,112 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "astra.fullname" . }}-api
+  labels:
+    {{- include "astra.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+spec:
+  replicas: {{ .Values.components.api.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "astra.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "astra.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: api
+      annotations:
+        checksum/runtime: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      securityContext:
+        {{- include "astra.podSecurityContext" . | nindent 8 }}
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: api
+          image: "{{ .Values.components.api.image.repository }}:{{ .Values.components.api.image.tag }}"
+          imagePullPolicy: {{ .Values.components.api.image.pullPolicy }}
+          securityContext:
+            {{- include "astra.containerSecurityContext" . | nindent 12 }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "astra.fullname" . }}-runtime
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: Production
+            - name: ConnectionStrings__Postgres
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.existingSecret }}
+                  key: {{ .Values.global.postgresConnectionStringKey }}
+            - name: ConnectionStrings__Orleans
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.existingSecret }}
+                  key: {{ .Values.global.orleansConnectionStringKey }}
+            - name: Astra__LiveOpsAuth__Audience
+              value: {{ .Values.global.liveOpsAuth.audience | quote }}
+            - name: Astra__LiveOpsAuth__RequireHttpsMetadata
+              value: {{ .Values.global.liveOpsAuth.requireHttpsMetadata | quote }}
+            - name: Astra__LiveOpsAuth__NameClaimType
+              value: {{ .Values.global.liveOpsAuth.nameClaimType | quote }}
+            - name: Astra__LiveOpsAuth__RoleClaimType
+              value: {{ .Values.global.liveOpsAuth.roleClaimType | quote }}
+            {{- if .Values.global.liveOpsAuth.authority }}
+            - name: Astra__LiveOpsAuth__Authority
+              value: {{ .Values.global.liveOpsAuth.authority | quote }}
+            {{- else }}
+            - name: Astra__LiveOpsAuth__SigningKey
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.existingSecret }}
+                  key: {{ .Values.global.liveOpsSigningKeyKey }}
+            {{- end }}
+            - name: Astra__LiveOpsAuth__DevTokenEnabled
+              value: "false"
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.components.api.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "astra.fullname" . }}-api
+  labels:
+    {{- include "astra.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.components.api.service.type }}
+  selector:
+    app.kubernetes.io/name: {{ include "astra.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: api
+  ports:
+    - name: http
+      port: {{ .Values.components.api.service.port }}
+      targetPort: http

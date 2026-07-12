@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "runId": "20260712141001-359df1",
+  "startedAtUtc": "2026-07-12T14:10:01.3154107+00:00",
+  "completedAtUtc": "2026-07-12T14:10:01.6571711+00:00",
+  "runtime": {
+    "api": "http://127.0.0.1:5191",
+    "admin": "http://127.0.0.1:5500",
+    "postgres": "astra-postgres:17-alpine",
+    "redisMode": "disabled; PostgreSQL fallback exercised",
+    "tcpGatewayPort": 5300
+  },
+  "content": {
+    "version": "portfolio-demo-20260712141001-359df1",
+    "checksum": "9d75c59d0dd86dbd8c731faeac908b74f38daac45f378730de565aa6fdfb37f2",
+    "bannerId": "pickup-demo-20260712141001-359df1",
+    "active": true
+  },
+  "player": {
+    "playerId": "8560bb33-b85c-4972-8d18-9dfab03cfe9f",
+    "initialGrant": 500,
+    "gachaCost": 100,
+    "compensation": 200,
+    "finalElifBalance": 600,
+    "ledgerVersion": 3
+  },
+  "gacha": {
+    "firstRequestReplayed": false,
+    "retryReplayed": true,
+    "exactResponseReplay": true,
+    "contentVersion": "portfolio-demo-20260712141001-359df1",
+    "contentChecksum": "9d75c59d0dd86dbd8c731faeac908b74f38daac45f378730de565aa6fdfb37f2",
+    "rewards": [
+      {
+        "rewardId": "character-standard-demo",
+        "rarity": 2,
+        "wasDuplicate": false
+      }
+    ]
+  },
+  "compensation": {
+    "incidentId": "incident-demo-20260712141001-359df1",
+    "mailId": "mail-demo-20260712141001-359df1",
+    "targetSnapshotMatched": true,
+    "firstClaimReplayed": false,
+    "retryReplayed": true,
+    "exactResponseReplay": true
+  },
+  "operations": {
+    "requiredAuditActions": [
+      "content.publish",
+      "wallet.grant",
+      "gacha.draw",
+      "mail.incident.create",
+      "mail.claim"
+    ],
+    "matchingAuditRows": 1,
+    "outboxPublishedDelta": 3,
+    "outboxPending": 3,
+    "outboxDeadLetters": 1
+  },
+  "tcp": {
+    "crossTransportReplayVerified": true,
+    "skipped": false,
+    "log": "C:\\Users\\kimmj\\Documents\\Codex\\2026-07-06\\new-chat-2\\astra-liveops\\output\\demo\\portfolio-demo-tcp-e2e.log"
+  },
+  "checks": {
+    "contentPublishAndActivation": true,
+    "gachaAtomicityAndReplay": true,
+    "incidentTargetSnapshot": true,
+    "mailClaimReplay": true,
+    "auditCoverage": true,
+    "outboxDelivery": true,
+    "tcpCrossTransport": true
+  }
+}

@@ -1,0 +1,3 @@
+name: astra-liveops-platform
+runtime: dotnet
+description: Deploys the ASTRA Helm release to an existing Kubernetes cluster

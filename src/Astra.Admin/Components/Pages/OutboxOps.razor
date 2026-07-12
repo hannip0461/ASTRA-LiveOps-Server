@@ -1,0 +1,158 @@
+@page "/outbox"
+@rendermode InteractiveServer
+@using Astra.Admin.Services
+@using Astra.Contracts
+@attribute [Authorize]
+@inject OutboxAdminApiClient ApiClient
+
+<PageTitle>Outbox Operations</PageTitle>
+
+<section class="ops-header">
+    <div>
+        <p class="eyebrow">Delivery Operations</p>
+        <h1>Transactional outbox</h1>
+        <p class="muted">Monitor delivery backlog and replay terminal failures after the cause is corrected.</p>
+    </div>
+    <button class="btn btn-outline-secondary" @onclick="LoadAsync" disabled="@busy">Refresh</button>
+</section>
+
+@if (overview is not null)
+{
+    <section class="outbox-summary" aria-label="Outbox status summary">
+        <div><span>Pending</span><strong>@overview.PendingCount</strong></div>
+        <div><span>Processing</span><strong>@overview.ProcessingCount</strong></div>
+        <div><span>Published</span><strong>@overview.PublishedCount</strong></div>
+        <div class="@(overview.DeadLetterCount > 0 ? "metric-alert" : null)"><span>Dead letter</span><strong>@overview.DeadLetterCount</strong></div>
+        <div><span>Delivered</span><strong>@overview.DeliveryCount</strong></div>
+        <div><span>Oldest pending</span><strong>@FormatAge(overview.OldestPendingAtUtc)</strong></div>
+    </section>
+}
+
+<section class="ops-panel">
+    <div class="panel-heading">
+        <h2>Dead-letter events</h2>
+        <span class="status @(deadLetters.Count > 0 ? "status-error" : "status-live")">@deadLetters.Count records</span>
+    </div>
+
+    <label class="block-label replay-reason">
+        Replay reason
+        <input class="form-control" maxlength="500" @bind="replayReason" placeholder="Required for Supervisor replay" />
+    </label>
+
+    @if (deadLetters.Count == 0)
+    {
+        <p class="muted compact">No dead-letter events found.</p>
+    }
+    else
+    {
+        <div class="table-scroll">
+            <table class="ops-table outbox-table">
+                <thead>
+                    <tr>
+                        <th>Failed</th>
+                        <th>Event</th>
+                        <th>Aggregate</th>
+                        <th>Error</th>
+                        <th>Attempts</th>
+                        <th>Replays</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var entry in deadLetters)
+                    {
+                        <tr>
+                            <td>@entry.DeadLetteredAtUtc?.ToString("MM-dd HH:mm:ss")</td>
+                            <td>
+                                <strong>@entry.EventType</strong>
+                                <div class="muted mono">@entry.EventId</div>
+                            </td>
+                            <td class="mono">@entry.AggregateId</td>
+                            <td><span class="status status-error">@entry.ErrorCode</span></td>
+                            <td>@entry.Attempts / @entry.MaxAttempts</td>
+                            <td>@entry.ManualReplayCount</td>
+                            <td>
+                                <AuthorizeView Roles="@LiveOpsRoles.Supervisor">
+                                    <Authorized>
+                                        <button class="btn btn-sm btn-outline-danger"
+                                                disabled="@(busy || string.IsNullOrWhiteSpace(replayReason))"
+                                                @onclick="() => ReplayAsync(entry.EventId)">
+                                            Replay
+                                        </button>
+                                    </Authorized>
+                                </AuthorizeView>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+@if (!string.IsNullOrWhiteSpace(message))
+{
+    <section class="result @(isError ? "result-error" : "result-ok")"><strong>@message</strong></section>
+}
+
+@code {
+    private OutboxOverviewDto? overview;
+    private IReadOnlyList<OutboxDeadLetterDto> deadLetters = [];
+    private string replayReason = "";
+    private string? message;
+    private bool isError;
+    private bool busy;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        busy = true;
+        message = null;
+        try
+        {
+            var overviewTask = ApiClient.GetOverviewAsync();
+            var deadLettersTask = ApiClient.GetDeadLettersAsync();
+            await Task.WhenAll(overviewTask, deadLettersTask);
+            overview = await overviewTask;
+            deadLetters = await deadLettersTask;
+        }
+        catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException)
+        {
+            isError = true;
+            message = exception.Message;
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private async Task ReplayAsync(Guid eventId)
+    {
+        busy = true;
+        message = null;
+        try
+        {
+            var result = await ApiClient.ReplayAsync(eventId, replayReason.Trim());
+            isError = false;
+            message = $"Queued {result.EventId} for replay (manual replay #{result.ManualReplayCount}).";
+            replayReason = "";
+            overview = await ApiClient.GetOverviewAsync();
+            deadLetters = await ApiClient.GetDeadLettersAsync();
+        }
+        catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException)
+        {
+            isError = true;
+            message = exception.Message;
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private static string FormatAge(DateTimeOffset? oldestPending) => oldestPending is null
+        ? "-"
+        : $"{Math.Max(0, (DateTimeOffset.UtcNow - oldestPending.Value).TotalSeconds):0}s";
+}

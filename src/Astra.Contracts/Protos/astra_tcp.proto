@@ -1,0 +1,117 @@
+syntax = "proto3";
+
+package astra.tcp.v1;
+
+option csharp_namespace = "Astra.Contracts.Tcp";
+
+enum ResponseStatus {
+  RESPONSE_STATUS_UNSPECIFIED = 0;
+  RESPONSE_STATUS_OK = 1;
+  RESPONSE_STATUS_INVALID_REQUEST = 2;
+  RESPONSE_STATUS_UNAUTHENTICATED = 3;
+  RESPONSE_STATUS_CONFLICT = 4;
+  RESPONSE_STATUS_NOT_FOUND = 5;
+  RESPONSE_STATUS_FAILED_PRECONDITION = 6;
+  RESPONSE_STATUS_INTERNAL_ERROR = 7;
+}
+
+message RequestEnvelope {
+  string request_id = 1;
+  string session_id = 2;
+  string idempotency_key = 3;
+  string trace_parent = 4;
+  string trace_state = 5;
+  uint32 protocol_version = 6;
+
+  oneof command {
+    BindSessionRequest bind_session = 10;
+    GetWalletRequest get_wallet = 11;
+    DrawGachaRequest draw_gacha = 12;
+  }
+}
+
+message BindSessionRequest {
+  string player_id = 1;
+  string access_token = 2;
+}
+
+message GetWalletRequest {}
+
+message DrawGachaRequest {
+  string banner_id = 1;
+  int32 draw_count = 2;
+}
+
+message ResponseEnvelope {
+  string request_id = 1;
+  string session_id = 2;
+  ResponseStatus status = 3;
+  string error_code = 4;
+  string error_message = 5;
+  bool replayed = 6;
+  uint32 protocol_version = 7;
+
+  oneof payload {
+    BindSessionResponse bind_session = 10;
+    WalletSnapshot wallet = 11;
+    GachaDrawResponse draw_gacha = 12;
+  }
+}
+
+message BindSessionResponse {
+  string player_id = 1;
+  int64 token_expires_at_unix_seconds = 2;
+}
+
+message CurrencyBalance {
+  int32 currency = 1;
+  int64 amount = 2;
+}
+
+message InventoryItem {
+  string item_id = 1;
+  int64 quantity = 2;
+}
+
+message Character {
+  string character_id = 1;
+  int32 rarity = 2;
+  int32 duplicate_count = 3;
+}
+
+message PityState {
+  string banner_id = 1;
+  int32 pity = 2;
+}
+
+message WalletSnapshot {
+  string player_id = 1;
+  repeated CurrencyBalance balances = 2;
+  int64 ledger_version = 3;
+  repeated InventoryItem inventory = 4;
+  repeated Character characters = 5;
+  repeated PityState pity = 6;
+}
+
+message DuplicateConversion {
+  string item_id = 1;
+  int64 quantity = 2;
+}
+
+message GachaReward {
+  int32 kind = 1;
+  string reward_id = 2;
+  int32 quantity = 3;
+  int32 rarity = 4;
+  bool was_duplicate = 5;
+  DuplicateConversion duplicate_conversion = 6;
+}
+
+message GachaDrawResponse {
+  string banner_id = 1;
+  string content_version = 2;
+  string content_checksum = 3;
+  repeated GachaReward rewards = 4;
+  int32 pity_after = 5;
+  WalletSnapshot wallet = 6;
+}

@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>dotnet-Astra.Silo-dae4b5e5-aace-4332-a65e-8a5a31d6738c</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
+    <PackageReference Include="Microsoft.Orleans.Server" Version="10.2.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Astra.Contracts\Astra.Contracts.csproj" />
+    <ProjectReference Include="..\Astra.Domain\Astra.Domain.csproj" />
+    <ProjectReference Include="..\Astra.Infrastructure\Astra.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

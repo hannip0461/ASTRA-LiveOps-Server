@@ -1,0 +1,22 @@
+{
+  "actions": [],
+  "consumer": "stackAlerts",
+  "name": "ASTRA Outbox dead letter",
+  "params": {
+    "esqlQuery": {
+      "esql": "FROM metrics-generic.otel-* | EVAL dead_letters = TO_LONG(`metrics.astra.outbox.dead_lettered`) | WHERE dead_letters > 0 | KEEP @timestamp, dead_letters, attributes.event.type, attributes.outcome | LIMIT 100"
+    },
+    "searchType": "esqlQuery",
+    "size": 0,
+    "threshold": [0],
+    "thresholdComparator": ">",
+    "timeField": "@timestamp",
+    "timeWindowSize": 5,
+    "timeWindowUnit": "m"
+  },
+  "rule_type_id": ".es-query",
+  "schedule": {
+    "interval": "10s"
+  },
+  "tags": ["astra", "outbox", "slo"]
+}

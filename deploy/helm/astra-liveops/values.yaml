@@ -1,0 +1,90 @@
+nameOverride: ""
+fullnameOverride: ""
+
+global:
+  clusterId: astra-liveops
+  serviceId: astra-liveops
+  existingSecret: astra-liveops-secrets
+  postgresConnectionStringKey: postgres-connection
+  orleansConnectionStringKey: postgres-connection
+  redis:
+    enabled: false
+    connectionStringKey: redis-connection
+  liveOpsSigningKeyKey: liveops-signing-key
+  liveOpsAuth:
+    authority: ""
+    audience: astra-liveops-admin-api
+    requireHttpsMetadata: true
+    nameClaimType: name
+    roleClaimType: role
+  tcpSigningKeyKey: tcp-signing-key
+  otlpEndpoint: ""
+  imagePullSecrets: []
+
+components:
+  silo:
+    replicas: 2
+    image:
+      repository: astra-silo
+      tag: "0.1.0"
+      pullPolicy: IfNotPresent
+    resources:
+      requests: { cpu: 250m, memory: 384Mi }
+      limits: { cpu: "1", memory: 1Gi }
+  api:
+    replicas: 2
+    image:
+      repository: astra-api
+      tag: "0.1.0"
+      pullPolicy: IfNotPresent
+    service:
+      type: ClusterIP
+      port: 8080
+    resources:
+      requests: { cpu: 100m, memory: 192Mi }
+      limits: { cpu: 500m, memory: 512Mi }
+  tcpGateway:
+    replicas: 2
+    image:
+      repository: astra-tcp-gateway
+      tag: "0.1.0"
+      pullPolicy: IfNotPresent
+    service:
+      type: ClusterIP
+      port: 5300
+    resources:
+      requests: { cpu: 100m, memory: 192Mi }
+      limits: { cpu: 500m, memory: 512Mi }
+  worker:
+    replicas: 1
+    image:
+      repository: astra-worker
+      tag: "0.1.0"
+      pullPolicy: IfNotPresent
+    resources:
+      requests: { cpu: 100m, memory: 192Mi }
+      limits: { cpu: 500m, memory: 512Mi }
+  admin:
+    enabled: true
+    replicas: 1
+    auth:
+      openIdConnect:
+        enabled: false
+        authority: ""
+        clientId: ""
+        clientSecretKey: admin-oidc-client-secret
+        publicOrigin: ""
+        apiScope: ""
+        requireHttpsMetadata: true
+        nameClaimType: name
+        roleClaimType: role
+    image:
+      repository: astra-admin
+      tag: "0.1.0"
+      pullPolicy: IfNotPresent
+    service:
+      type: ClusterIP
+      port: 8080
+    resources:
+      requests: { cpu: 100m, memory: 192Mi }
+      limits: { cpu: 500m, memory: 512Mi }

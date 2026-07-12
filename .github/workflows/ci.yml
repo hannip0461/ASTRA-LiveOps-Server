@@ -1,0 +1,137 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: astra
+          POSTGRES_USER: astra
+          POSTGRES_PASSWORD: astra_dev_password
+        ports:
+          - 54329:5432
+        options: >-
+          --health-cmd "pg_isready -U astra -d astra"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+    env:
+      ASTRA_RUN_POSTGRES_TESTS: "1"
+      ASTRA_POSTGRES_CONNECTION: Host=localhost;Port=54329;Database=astra;Username=astra;Password=astra_dev_password
+      ASTRA_DEV_SIGNING_KEY: ci-only-liveops-jwt-signing-key-2026
+      ASTRA_DEV_TOKEN_KEY: ci-only-development-token-bootstrap-key-2026
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet restore Astra.LiveOps.slnx
+      - run: dotnet build Astra.LiveOps.slnx --no-restore --configuration Release
+      - run: dotnet test Astra.LiveOps.slnx --no-build --configuration Release --logger "console;verbosity=normal"
+      - name: TCP gateway end-to-end
+        shell: bash
+        run: |
+          set -euo pipefail
+          export Astra__Orleans__ClusterProvider=AdoNet
+          export Astra__Orleans__ClusterId=astra-ci
+          export Astra__Orleans__ServiceId=astra-liveops
+          export Astra__Orleans__AdvertisedIPAddress=127.0.0.1
+          export ConnectionStrings__Orleans="$ASTRA_POSTGRES_CONNECTION"
+          DOTNET_ENVIRONMENT=Development \
+            Astra__StoreProvider=PostgreSQL \
+            Astra__ApplyDatabaseSchema=true \
+            ConnectionStrings__Postgres="$ASTRA_POSTGRES_CONNECTION" \
+            ConnectionStrings__Redis= \
+            dotnet run --no-build --configuration Release --project src/Astra.Silo/Astra.Silo.csproj \
+            > /tmp/astra-silo.log 2>&1 &
+          SILO_PID=$!
+
+          cleanup() {
+            for pid in "${SILO_PID:-}" "${API_PID:-}" "${TCP_PID:-}"; do
+              if [[ -n "$pid" ]]; then kill "$pid" 2>/dev/null || true; fi
+            done
+          }
+          trap cleanup EXIT
+
+          for attempt in {1..30}; do
+            if (echo > /dev/tcp/127.0.0.1/11111) 2>/dev/null; then break; fi
+            sleep 1
+          done
+
+          ASPNETCORE_ENVIRONMENT=Development ASPNETCORE_URLS=http://127.0.0.1:5191 \
+            Astra__LiveOpsAuth__SigningKey="$ASTRA_DEV_SIGNING_KEY" \
+            Astra__LiveOpsAuth__DevTokenKey="$ASTRA_DEV_TOKEN_KEY" \
+            dotnet run --no-build --configuration Release --project src/Astra.Api/Astra.Api.csproj \
+            > /tmp/astra-api.log 2>&1 &
+          API_PID=$!
+          DOTNET_ENVIRONMENT=Development \
+            dotnet run --no-build --configuration Release --project src/Astra.TcpGateway/Astra.TcpGateway.csproj \
+            > /tmp/astra-tcp.log 2>&1 &
+          TCP_PID=$!
+
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:5191/health/ready >/dev/null && \
+               (echo > /dev/tcp/127.0.0.1/5300) 2>/dev/null; then break; fi
+            sleep 1
+          done
+
+          ASTRA_RUN_TCP_E2E=1 ASTRA_RUN_API_E2E=1 \
+            dotnet test tests/Astra.IntegrationTests/Astra.IntegrationTests.csproj \
+            --no-build --configuration Release \
+            --filter "FullyQualifiedName~TcpGatewayEndToEndTests|FullyQualifiedName~AdminAuthorizationEndToEndTests|FullyQualifiedName~ApiBoundaryEndToEndTests|FullyQualifiedName~OutboxOperationsEndToEndTests"
+
+  deployment-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: azure/setup-helm@v4
+      - uses: hashicorp/setup-terraform@v3
+
+      - name: Pulumi program compiles
+        run: dotnet build deploy/pulumi/Astra.LiveOps.Deploy.csproj --configuration Release
+
+      - name: Pulumi offline preview
+        env:
+          PULUMI_CONFIG_PASSPHRASE: ci-local-preview-only
+          PULUMI_SKIP_UPDATE_CHECK: "true"
+        run: |
+          pulumi login --local --non-interactive
+          pulumi -C deploy/pulumi stack init ci --non-interactive
+          pulumi -C deploy/pulumi config set imageRegistry example.azurecr.io --stack ci --non-interactive
+          pulumi -C deploy/pulumi config set renderDirectory /tmp/astra-pulumi-render --stack ci --non-interactive
+          pulumi -C deploy/pulumi preview --stack ci --non-interactive --refresh=false
+
+      - name: Helm chart renders
+        run: |
+          helm lint deploy/helm/astra-liveops
+          helm template astra deploy/helm/astra-liveops --namespace astra > /tmp/astra-liveops.yaml
+          test "$(grep -c '^kind:' /tmp/astra-liveops.yaml)" -ge 10
+
+      - name: Terraform validates
+        run: |
+          terraform -chdir=deploy/terraform fmt -check
+          terraform -chdir=deploy/terraform init -backend=false -input=false
+          terraform -chdir=deploy/terraform validate
+
+      - name: Dockerfile static checks
+        run: docker build --check --target api .
+
+      - name: Build service images
+        shell: bash
+        run: |
+          set -euo pipefail
+          for target in api admin silo tcp-gateway worker; do
+            docker build --target "$target" --tag "astra-$target:ci" .
+          done

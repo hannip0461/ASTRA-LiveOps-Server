@@ -1,0 +1,22 @@
+{
+  "actions": [],
+  "consumer": "stackAlerts",
+  "name": "ASTRA PostgreSQL pool acquisition timeout",
+  "params": {
+    "esqlQuery": {
+      "esql": "FROM metrics-generic.otel-* | EVAL failure_count = TO_LONG(`metrics.astra.postgres.connection.acquire.failures`) | WHERE failure_count > 0 AND attributes.reason == \"timeout\" | KEEP @timestamp, failure_count, attributes.reason | LIMIT 100"
+    },
+    "searchType": "esqlQuery",
+    "size": 0,
+    "threshold": [0],
+    "thresholdComparator": ">",
+    "timeField": "@timestamp",
+    "timeWindowSize": 5,
+    "timeWindowUnit": "m"
+  },
+  "rule_type_id": ".es-query",
+  "schedule": {
+    "interval": "10s"
+  },
+  "tags": ["astra", "postgresql", "slo"]
+}

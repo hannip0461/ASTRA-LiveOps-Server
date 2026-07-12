@@ -1,0 +1,150 @@
+{
+  "title": "ASTRA LiveOps - Runtime and PostgreSQL",
+  "description": "OTLP signals collected through the EDOT gateway. Counts are intentionally low-cardinality operational signals.",
+  "time_range": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "grid": { "x": 0, "y": 0, "w": 24, "h": 10 },
+      "type": "vis",
+      "config": {
+        "type": "xy",
+        "title": "Trace spans received",
+        "layers": [
+          {
+            "type": "line",
+            "data_source": {
+              "type": "esql",
+              "query": "FROM traces-generic.otel-* | WHERE @timestamp >= ?_tstart AND @timestamp < ?_tend | STATS spans = COUNT() BY bucket = BUCKET(@timestamp, 75, ?_tstart, ?_tend) | SORT bucket"
+            },
+            "x": { "column": "bucket" },
+            "y": [{ "column": "spans" }]
+          }
+        ],
+        "axis": { "x": { "title": { "visible": false } } }
+      }
+    },
+    {
+      "grid": { "x": 24, "y": 0, "w": 24, "h": 10 },
+      "type": "vis",
+      "config": {
+        "type": "xy",
+        "title": "ASTRA metric samples received",
+        "layers": [
+          {
+            "type": "line",
+            "data_source": {
+              "type": "esql",
+              "query": "FROM metrics-generic.otel-* | WHERE @timestamp >= ?_tstart AND @timestamp < ?_tend AND `resource.attributes.service.name` LIKE \"Astra*\" | STATS samples = COUNT() BY bucket = BUCKET(@timestamp, 75, ?_tstart, ?_tend) | SORT bucket"
+            },
+            "x": { "column": "bucket" },
+            "y": [{ "column": "samples" }]
+          }
+        ],
+        "axis": { "x": { "title": { "visible": false } } }
+      }
+    },
+    {
+      "grid": { "x": 0, "y": 10, "w": 24, "h": 10 },
+      "type": "vis",
+      "config": {
+        "type": "xy",
+        "title": "PostgreSQL connection acquisition failures",
+        "layers": [
+          {
+            "type": "line",
+            "data_source": {
+              "type": "esql",
+              "query": "FROM metrics-generic.otel-* | WHERE @timestamp >= ?_tstart AND @timestamp < ?_tend AND (attributes.synthetic IS NULL OR attributes.synthetic == false) | EVAL failure_count = TO_LONG(`metrics.astra.postgres.connection.acquire.failures`) | WHERE failure_count > 0 | STATS failures = SUM(failure_count) BY bucket = BUCKET(@timestamp, 75, ?_tstart, ?_tend) | SORT bucket"
+            },
+            "x": { "column": "bucket" },
+            "y": [{ "column": "failures" }]
+          }
+        ],
+        "axis": { "x": { "title": { "visible": false } } }
+      }
+    },
+    {
+      "grid": { "x": 24, "y": 10, "w": 24, "h": 10 },
+      "type": "vis",
+      "config": {
+        "type": "xy",
+        "title": "PostgreSQL acquisition SLO burn rate (99.9%)",
+        "layers": [
+          {
+            "type": "line",
+            "data_source": {
+              "type": "esql",
+              "query": "FROM metrics-generic.otel-* | WHERE @timestamp >= ?_tstart AND @timestamp < ?_tend AND (attributes.synthetic IS NULL OR attributes.synthetic == false) | EVAL attempts = COALESCE(TO_LONG(`metrics.astra.postgres.connection.acquire.attempts`), 0), failures = COALESCE(TO_LONG(`metrics.astra.postgres.connection.acquire.failures`), 0) | STATS attempts = SUM(attempts), failures = SUM(failures) BY bucket = BUCKET(@timestamp, 75, ?_tstart, ?_tend) | WHERE attempts > 0 | EVAL burn_rate = TO_DOUBLE(failures) / TO_DOUBLE(attempts) / 0.001 | SORT bucket"
+            },
+            "x": { "column": "bucket" },
+            "y": [{ "column": "burn_rate" }]
+          }
+        ],
+        "axis": { "x": { "title": { "visible": false } } }
+      }
+    },
+    {
+      "grid": { "x": 0, "y": 20, "w": 16, "h": 10 },
+      "type": "vis",
+      "config": {
+        "type": "xy",
+        "title": "Outbox published",
+        "layers": [
+          {
+            "type": "line",
+            "data_source": {
+              "type": "esql",
+              "query": "FROM metrics-generic.otel-* | WHERE @timestamp >= ?_tstart AND @timestamp < ?_tend | EVAL published = TO_LONG(`metrics.astra.outbox.published`) | WHERE published IS NOT NULL | STATS published = SUM(published) BY bucket = BUCKET(@timestamp, 75, ?_tstart, ?_tend) | SORT bucket"
+            },
+            "x": { "column": "bucket" },
+            "y": [{ "column": "published" }]
+          }
+        ],
+        "axis": { "x": { "title": { "visible": false } } }
+      }
+    },
+    {
+      "grid": { "x": 16, "y": 20, "w": 16, "h": 10 },
+      "type": "vis",
+      "config": {
+        "type": "xy",
+        "title": "Outbox retries",
+        "layers": [
+          {
+            "type": "line",
+            "data_source": {
+              "type": "esql",
+              "query": "FROM metrics-generic.otel-* | WHERE @timestamp >= ?_tstart AND @timestamp < ?_tend | EVAL retries = TO_LONG(`metrics.astra.outbox.retry_scheduled`) | WHERE retries IS NOT NULL | STATS retries = SUM(retries) BY bucket = BUCKET(@timestamp, 75, ?_tstart, ?_tend) | SORT bucket"
+            },
+            "x": { "column": "bucket" },
+            "y": [{ "column": "retries" }]
+          }
+        ],
+        "axis": { "x": { "title": { "visible": false } } }
+      }
+    },
+    {
+      "grid": { "x": 32, "y": 20, "w": 16, "h": 10 },
+      "type": "vis",
+      "config": {
+        "type": "xy",
+        "title": "Outbox dead letters",
+        "layers": [
+          {
+            "type": "line",
+            "data_source": {
+              "type": "esql",
+              "query": "FROM metrics-generic.otel-* | WHERE @timestamp >= ?_tstart AND @timestamp < ?_tend | EVAL dead_letters = TO_LONG(`metrics.astra.outbox.dead_lettered`) | WHERE dead_letters IS NOT NULL | STATS dead_letters = SUM(dead_letters) BY bucket = BUCKET(@timestamp, 75, ?_tstart, ?_tend) | SORT bucket"
+            },
+            "x": { "column": "bucket" },
+            "y": [{ "column": "dead_letters" }]
+          }
+        ],
+        "axis": { "x": { "title": { "visible": false } } }
+      }
+    }
+  ]
+}

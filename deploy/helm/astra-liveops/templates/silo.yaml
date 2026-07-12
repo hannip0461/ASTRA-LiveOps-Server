@@ -1,0 +1,111 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "astra.fullname" . }}-silo
+  labels:
+    {{- include "astra.labels" . | nindent 4 }}
+    app.kubernetes.io/component: silo
+spec:
+  replicas: {{ .Values.components.silo.replicas }}
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "astra.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: silo
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "astra.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: silo
+      annotations:
+        checksum/runtime: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        {{- include "astra.podSecurityContext" . | nindent 8 }}
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: silo
+          image: "{{ .Values.components.silo.image.repository }}:{{ .Values.components.silo.image.tag }}"
+          imagePullPolicy: {{ .Values.components.silo.image.pullPolicy }}
+          securityContext:
+            {{- include "astra.containerSecurityContext" . | nindent 12 }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "astra.fullname" . }}-runtime
+          env:
+            - name: DOTNET_ENVIRONMENT
+              value: Production
+            - name: Astra__StoreProvider
+              value: PostgreSQL
+            - name: Astra__ApplyDatabaseSchema
+              value: "false"
+            - name: Astra__Orleans__AdvertisedIPAddress
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: ConnectionStrings__Postgres
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.existingSecret }}
+                  key: {{ .Values.global.postgresConnectionStringKey }}
+            - name: ConnectionStrings__Orleans
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.existingSecret }}
+                  key: {{ .Values.global.orleansConnectionStringKey }}
+            {{- if .Values.global.redis.enabled }}
+            - name: ConnectionStrings__Redis
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.existingSecret }}
+                  key: {{ .Values.global.redis.connectionStringKey }}
+            {{- end }}
+          ports:
+            - name: silo
+              containerPort: 11111
+            - name: gateway
+              containerPort: 30000
+          readinessProbe:
+            tcpSocket:
+              port: gateway
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: silo
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.components.silo.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 128Mi
+---
+{{- if gt (int .Values.components.silo.replicas) 1 }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "astra.fullname" . }}-silo
+  labels:
+    {{- include "astra.labels" . | nindent 4 }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "astra.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: silo
+{{- end }}

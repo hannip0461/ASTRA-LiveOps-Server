@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "astra.fullname" . }}-runtime
+  labels:
+    {{- include "astra.labels" . | nindent 4 }}
+data:
+  Astra__Orleans__ClusterProvider: AdoNet
+  Astra__Orleans__ClusterId: {{ .Values.global.clusterId | quote }}
+  Astra__Orleans__ServiceId: {{ .Values.global.serviceId | quote }}
+  Astra__OpenTelemetry__OtlpEndpoint: {{ .Values.global.otlpEndpoint | quote }}
+  Astra__OpenTelemetry__Enabled: "true"

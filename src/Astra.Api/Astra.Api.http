@@ -1,0 +1,6 @@
+@Astra.Api_HostAddress = http://localhost:5191
+
+GET {{Astra.Api_HostAddress}}/health
+Accept: application/json
+
+###

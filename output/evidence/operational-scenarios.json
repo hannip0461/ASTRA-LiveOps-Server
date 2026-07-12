@@ -1,0 +1,28 @@
+{
+  "capturedAtUtc": "2026-07-12T07:56:53.1877924+00:00",
+  "probeId": "539fd249e2854122bf5360a478039b93",
+  "pool": {
+    "configuredSize": 2,
+    "timeoutMilliseconds": 1012,
+    "recoveryProbe": 1,
+    "observedAttempts": 4,
+    "observedTimeouts": 1,
+    "failureRate": 0.25,
+    "burnRate": 250.0
+  },
+  "outbox": {
+    "publishedEventId": "d1e39543-6f4b-4212-b0f5-9489441b2b1a",
+    "publishedStatus": "published",
+    "deadLetterEventId": "d9564c37-f951-4a0d-9fce-76e4576e4b82",
+    "deadLetterStatus": "dead_letter",
+    "attempts": 2,
+    "errorCode": "outbox_payload_invalid",
+    "observedPublished": 1,
+    "observedRetries": 1,
+    "observedDeadLetters": 1
+  },
+  "alerts": {
+    "outboxDeadLetterActive": 1
+  },
+  "dashboard": "http://127.0.0.1:5609/app/dashboards#/view/83049b3c-ac0e-4dab-bd8b-c9bce62021a0"
+}

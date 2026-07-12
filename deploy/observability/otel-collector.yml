@@ -1,0 +1,62 @@
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+connectors:
+  elasticapm: {}
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 256
+    spike_limit_mib: 64
+  batch:
+    send_batch_size: 512
+    send_batch_max_size: 768
+    timeout: 1s
+  batch/metrics:
+    send_batch_max_size: 0
+    timeout: 1s
+  elasticapm: {}
+
+exporters:
+  elasticsearch/otel:
+    endpoints:
+      - ${env:ELASTIC_ENDPOINT}
+    mapping:
+      mode: otel
+    sending_queue:
+      enabled: true
+      num_consumers: 2
+      queue_size: 1000
+
+service:
+  extensions: [health_check]
+  telemetry:
+    logs:
+      level: info
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch/metrics]
+      exporters: [elasticsearch/otel]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [elasticapm, elasticsearch/otel]
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch, elasticapm]
+      exporters: [elasticapm, elasticsearch/otel]
+    metrics/aggregated-otel-metrics:
+      receivers: [elasticapm]
+      processors: [memory_limiter, batch/metrics]
+      exporters: [elasticsearch/otel]

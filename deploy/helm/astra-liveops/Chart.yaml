@@ -1,0 +1,6 @@
+apiVersion: v2
+name: astra-liveops
+description: ASTRA LiveOps application services
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
