@@ -16,7 +16,6 @@ tmp-runtime/
 logs/
 tmp/
 outputs/
-.playwright-cli/
 
 # User-specific files
 *.rsuser

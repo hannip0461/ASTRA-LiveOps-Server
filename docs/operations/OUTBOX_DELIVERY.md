@@ -1,72 +1,72 @@
-# Outbox Delivery
+# Outbox 전달 정책
 
-## Consistency Boundary
+## 정합성 경계
 
-A player command commits its domain state, ledger/history, completed idempotency response, and pending outbox row in one PostgreSQL transaction. The client response waits for that commit; it does not wait for a downstream consumer.
+플레이어 command는 domain state, ledger/history, completed idempotency response와 pending Outbox row를 하나의 PostgreSQL transaction에서 commit한다. Client response는 이 commit을 기다리지만 downstream consumer 완료는 기다리지 않는다.
 
-Delivery is **at least once**, not exactly once. Workers lease ready rows with `FOR UPDATE SKIP LOCKED`. An expired processing lease returns to pending so another worker can recover it.
+전달 보장은 **at least once**다. Worker는 `FOR UPDATE SKIP LOCKED`로 처리 가능한 row를 lease한다. Processing lease가 만료되면 pending으로 돌아가 다른 Worker가 복구할 수 있다.
 
-## Consumer Idempotency
+## 소비자 멱등 처리
 
-Each outbox row carries a versioned, event-specific payload rather than copying the API response or player snapshot. `PostgresOperationalEventHandler` is the first concrete consumer adapter. It writes a smaller operational projection under the primary key `(consumer_name, event_id)`. A repeated delivery uses `ON CONFLICT DO NOTHING`. During rolling deployment it can also read the previous response-shaped payload format, which is projected as schema version `0`.
+각 Outbox row에는 API response나 player snapshot 대신 version이 포함된 event별 payload를 저장한다. `PostgresOperationalEventHandler`는 `(consumer_name, event_id)` primary key로 작은 운영 projection을 기록한다. 반복 전달은 `ON CONFLICT DO NOTHING`으로 중복 effect를 방지한다. Rolling deployment 중에는 이전 response 형태의 payload도 읽어 schema version `0`으로 projection한다.
 
-This closes the important crash window:
+Crash window는 다음 순서로 복구한다.
 
-1. the consumer projection commits;
-2. the worker crashes before marking the outbox row published;
-3. the lease expires and the event is delivered again;
-4. the consumer observes the same key, performs no duplicate effect, and the worker marks it published.
+1. Consumer projection이 commit된다.
+2. Worker가 Outbox row를 published로 바꾸기 전에 종료된다.
+3. Lease 만료 후 event가 다시 전달된다.
+4. Consumer는 같은 key를 확인해 effect를 반복하지 않고 Worker는 row를 published로 변경한다.
 
-The projection contains only event-specific operational fields such as content version, reward count, and ledger version. Full command responses, idempotency keys, wallet contents, and unexpected payload properties are not copied. Unknown event types and payload/schema mismatches fail closed.
+Projection에는 content version, reward count, ledger version 같은 event별 운영 field만 저장한다. 전체 command response, idempotency key, wallet 내용과 예상하지 못한 payload property는 복사하지 않는다. 지원하지 않는 event type과 payload/schema 불일치는 실패로 처리한다.
 
-The PostgreSQL projection is a portfolio-stage consumer that makes the delivery boundary executable without requiring another broker image. A production notification, analytics, or stream adapter can replace it while retaining the same event ID idempotency contract.
+현재 PostgreSQL projection은 별도 broker 없이 delivery 경계를 실행 가능하게 검증하는 consumer다. Notification, analytics 또는 stream adapter로 교체해도 event ID 기반 멱등 contract를 유지한다.
 
-## Retry And Dead Letter
+## 재시도와 격리 처리
 
-Handler failures use bounded exponential retry. The database stores a stable error code rather than an exception message:
+Handler 오류는 bounded exponential retry를 사용한다. DB에는 exception message 대신 안정적인 오류 코드를 저장한다.
 
-- `outbox_event_unsupported`;
-- `outbox_payload_invalid`;
-- `outbox_consumer_store_unavailable`;
-- `outbox_consumer_failed`.
+- `outbox_event_unsupported`
+- `outbox_payload_invalid`
+- `outbox_consumer_store_unavailable`
+- `outbox_consumer_failed`
 
-After `max_attempts`, the row moves to `dead_letter` and records `dead_lettered_at`. It is no longer leased automatically.
+`max_attempts` 이후 row는 `dead_letter`로 이동하고 `dead_lettered_at`을 기록한다. 이후 자동 lease 대상에서 제외한다.
 
-A Supervisor can replay a dead-letter event only through the audited Admin API. Replay requires a reason, resets attempts, increments `manual_replay_count`, and returns the row to pending. Viewer endpoints expose counts and dead-letter metadata but never payload or idempotency-key contents.
+Supervisor는 감사 대상 Admin API로만 dead-letter event를 replay할 수 있다. Replay는 사유 입력을 요구하며 attempts를 초기화하고 `manual_replay_count`를 증가시킨 뒤 row를 pending으로 돌린다. Viewer API는 count와 dead-letter metadata만 제공하며 payload와 idempotency key를 노출하지 않는다.
 
-## Retention
+## 보존 정책
 
-`PersistenceCleanupWorker` runs once at startup and then on a bounded interval. Defaults are seven days for published outbox rows and thirty days for orphan delivery projections. Each cycle has fixed batch, maximum-batch, and query-timeout limits. The same cycle also removes expired idempotency records; its complete policy is documented in `docs/persistence/RETENTION.md`.
+`PersistenceCleanupWorker`는 시작 시 한 번, 이후 제한된 주기로 실행된다. 기본 retention은 published Outbox 7일, orphan delivery projection 30일이다. Batch 크기, cycle당 최대 batch와 query timeout을 제한한다. Idempotency 정리 정책은 `docs/persistence/RETENTION.md`에 정의한다.
 
-Published outbox rows and their consumer delivery projections are deleted in one PostgreSQL statement. This prevents cleanup from removing the idempotency record while leaving a source event eligible for redelivery. `pending`, `processing`, and `dead_letter` rows are never removed automatically. An orphan projection is eligible only when its source outbox row no longer exists and its separate retention window has expired.
+Published Outbox row와 consumer delivery projection은 하나의 PostgreSQL statement로 삭제한다. `pending`, `processing`, `dead_letter` row는 자동 삭제하지 않는다. Source Outbox row가 없고 별도 retention이 지난 projection만 orphan으로 정리한다.
 
-The hard-kill integration test starts a separate consumer process, waits until its projection commits, kills the process before the outbox status update, and verifies that lease recovery publishes the event without creating a second projection.
+Hard-kill integration test는 별도 consumer process의 projection commit을 기다린 뒤 Outbox status 갱신 전에 process를 종료한다. Lease 복구가 두 번째 projection 없이 event를 published로 만드는지 검증한다.
 
-The operational observability probe adds a separate runtime demonstration. It inserts one valid versioned event and one event with an unsupported payload version. The real Worker publishes the valid event and drives the invalid event through one retry to `dead_letter`; the script then verifies the three delta metrics and the Kibana dead-letter rule. Previous probe rows are removed by their dedicated `operational-probe-` idempotency-key prefix, leaving only the latest evidence pair.
+운영 scenario test는 정상 versioned event와 지원하지 않는 payload version event를 삽입한다. Worker가 정상 event를 publish하고 잘못된 event를 retry 후 `dead_letter`로 이동시키는지, 관련 delta metric과 Kibana rule이 생성되는지 확인한다.
 
-## Operations Surface
+## 운영 API
 
-| Route | Minimum role | Purpose |
-| --- | --- | --- |
-| `GET /api/admin/outbox/overview` | Viewer | Backlog, delivery, and dead-letter counts |
-| `GET /api/admin/outbox/dead-letters` | Viewer | Bounded terminal-failure list |
-| `POST /api/admin/outbox/dead-letters/{eventId}/replay` | Supervisor | Reason-required audited replay |
+| Route | 최소 역할 | 용도 |
+|---|---|---|
+| `GET /api/admin/outbox/overview` | Viewer | Backlog, delivery, dead-letter count |
+| `GET /api/admin/outbox/dead-letters` | Viewer | 제한된 terminal failure 목록 |
+| `POST /api/admin/outbox/dead-letters/{eventId}/replay` | Supervisor | 사유와 audit가 필요한 replay |
 
-The Blazor `/outbox` page uses these routes. The replay action is recorded as `outbox.dead_letter.replay` in `admin_operation_audit`.
+Blazor `/outbox` 화면이 이 API를 사용한다. Replay는 `admin_operation_audit`에 `outbox.dead_letter.replay`로 기록한다.
 
-## Telemetry
+## 관측 지표
 
-The worker emits traces from `Astra.LiveOps` and low-cardinality metrics:
+Worker는 `Astra.LiveOps` trace와 다음 low-cardinality metric을 전송한다.
 
-- `astra.outbox.leased`;
-- `astra.outbox.published`;
-- `astra.outbox.retry_scheduled`;
-- `astra.outbox.dead_lettered`;
-- `astra.outbox.cycle_failures`;
-- `astra.outbox.processing.duration` in milliseconds;
-- `astra.persistence.cleanup.published_outbox_deleted`;
-- `astra.persistence.cleanup.deliveries_deleted`;
-- `astra.persistence.cleanup.idempotency_deleted`;
-- `astra.persistence.cleanup.failures`.
+- `astra.outbox.leased`
+- `astra.outbox.published`
+- `astra.outbox.retry_scheduled`
+- `astra.outbox.dead_lettered`
+- `astra.outbox.cycle_failures`
+- `astra.outbox.processing.duration`
+- `astra.persistence.cleanup.published_outbox_deleted`
+- `astra.persistence.cleanup.deliveries_deleted`
+- `astra.persistence.cleanup.idempotency_deleted`
+- `astra.persistence.cleanup.failures`
 
-Metric tags are limited to event type and outcome. Event IDs and aggregate IDs remain trace/log fields and are not metric labels.
+Metric tag는 event type과 outcome으로 제한한다. Event ID와 aggregate ID는 trace/log field에만 기록한다.

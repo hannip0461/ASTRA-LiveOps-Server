@@ -1,54 +1,54 @@
-# ASTRA TCP + Protobuf Protocol v1
+# ASTRA TCP + Protobuf 프로토콜 v1
 
-## Transport
+## 전송 형식
 
 - TCP port: `5300`
-- Frame header: 4-byte signed length in network byte order (big-endian)
-- Payload: one serialized Protobuf `RequestEnvelope` or `ResponseEnvelope`
-- Default maximum payload: 65,536 bytes
-- Requests are processed sequentially per connection, preserving response order.
-- The schema source is `src/Astra.Contracts/Protos/astra_tcp.proto`.
+- Frame header: network byte order(big-endian)의 signed length 4 byte
+- Payload: serialized Protobuf `RequestEnvelope` 또는 `ResponseEnvelope` 1개
+- 기본 최대 payload: 65,536 byte
+- Connection별 request를 순서대로 처리해 response 순서를 유지
+- Schema: `src/Astra.Contracts/Protos/astra_tcp.proto`
 
-`protocol_version` must be `1`. Unknown fields remain compatible with Protobuf evolution, while an incompatible protocol receives `protocol_version_unsupported`.
+`protocol_version`은 `1`이어야 한다. Protobuf evolution을 위해 unknown field는 허용하고 호환되지 않는 version은 `protocol_version_unsupported`로 거부한다.
 
-## Session Lifecycle
+## 세션 생명주기
 
-1. Client opens a TCP connection.
-2. Client sends `bind_session` with `player_id` and an HMAC-signed access token.
-3. Gateway validates player binding and token expiry, then returns a random `session_id`.
-4. Every game command on that connection must include the returned `session_id`.
-5. Rebinding or using a session from another connection is rejected.
-6. Token expiry is checked again for every game command.
+1. Client가 TCP connection을 연다.
+2. `player_id`와 HMAC-signed access token을 포함한 `bind_session`을 전송한다.
+3. Gateway가 player binding과 token expiry를 검증한 뒤 random `session_id`를 반환한다.
+4. 해당 connection의 모든 game command는 반환된 `session_id`를 포함해야 한다.
+5. Rebinding과 다른 connection의 session 사용을 거부한다.
+6. 모든 game command에서 token expiry를 다시 검사한다.
 
-The development signing key lives only in `appsettings.Development.json`. A deployed environment must provide `Astra:TcpSessionToken:SigningKey` through secret configuration.
+개발 signing key는 `appsettings.Development.json`에서만 사용한다. 배포 환경은 secret configuration으로 `Astra:TcpSessionToken:SigningKey`를 전달해야 한다.
 
-## Commands
+## 명령
 
 ### `get_wallet`
 
-- Read-only request; `idempotency_key` must be empty.
-- Calls `IPlayerAccountGrain.GetSnapshotAsync()` through the Gateway's embedded Orleans Client.
-- Returns a typed Protobuf `WalletSnapshot`.
+- Read-only request이므로 `idempotency_key`는 비워야 한다.
+- Gateway의 Orleans Client가 `IPlayerAccountGrain.GetSnapshotAsync()`를 호출한다.
+- Typed Protobuf `WalletSnapshot`을 반환한다.
 
 ### `draw_gacha`
 
-- Requires `banner_id`, `draw_count`, and `idempotency_key`.
-- Gateway creates the canonical request hash from player, banner, and draw count. Client-provided hashes are not trusted. ASP.NET Core uses the same `PlayerRequestHash` rule, so an HTTP request can be retried through TCP without a false conflict.
-- Calls `IPlayerAccountGrain.DrawGachaAsync()` directly; ASP.NET Core API is not in this path.
-- Returns a typed `GachaDrawResponse` and `replayed=true` when the completed result is reused.
+- `banner_id`, `draw_count`, `idempotency_key`가 필요하다.
+- Gateway는 player, banner, draw count로 canonical request hash를 생성하며 client hash를 신뢰하지 않는다. ASP.NET Core도 같은 `PlayerRequestHash` 규칙을 사용해 HTTP 요청을 TCP로 재시도할 수 있다.
+- `IPlayerAccountGrain.DrawGachaAsync()`를 직접 호출한다. ASP.NET Core API를 경유하지 않는다.
+- Typed `GachaDrawResponse`를 반환하고 completed result를 재사용하면 `replayed=true`를 설정한다.
 
-## Retry Semantics
+## 재시도 정책
 
-- `request_id` correlates one transport request and response. It is not an idempotency key.
-- A reconnect receives a new `session_id` but may resend the same mutation `idempotency_key`.
-- The same key and same command body returns the stored result without another draw or debit.
-- The same key with a different command body returns `idempotency_conflict`.
-- A Gateway timeout is ambiguous: the Grain may still commit. The client must retry with the same idempotency key.
+- `request_id`는 transport request와 response를 연결하며 idempotency key가 아니다.
+- 재연결 시 새 `session_id`를 받지만 같은 mutation `idempotency_key`를 다시 전송할 수 있다.
+- 같은 key와 같은 command body는 draw와 debit을 반복하지 않고 저장된 결과를 반환한다.
+- 같은 key에 다른 command body를 사용하면 `idempotency_conflict`를 반환한다.
+- Gateway timeout 시 Grain이 commit했을 수 있으므로 client는 같은 idempotency key로 재시도해야 한다.
 
-## Limits And Security
+## 제한과 보안
 
-- Identifier fields allow ASCII letters, digits, `.`, `_`, `-`, and `:` only.
-- Default limits: 1,024 connections, 1,000 requests per connection, 2-minute idle timeout, 10-second command timeout, and 10-second response write timeout.
-- Oversized or malformed frames close the connection; oversized responses return `response_too_large` when possible.
-- Rented buffers are cleared before returning to the shared pool.
-- Local development is plaintext TCP. Production must terminate TLS at the trusted ingress or add `SslStream` with certificate validation.
+- 식별자 field는 ASCII letter, digit, `.`, `_`, `-`, `:`만 허용한다.
+- 기본 제한: connection 1,024개, connection별 request 1,000개, idle timeout 2분, command timeout 10초, response write timeout 10초
+- 과도하거나 잘못된 frame은 connection을 종료한다. 가능한 경우 과도한 response에 `response_too_large`를 반환한다.
+- Shared pool에 반환하기 전에 rented buffer를 초기화한다.
+- 로컬 개발은 plaintext TCP를 사용한다. 운영 환경은 신뢰된 ingress에서 TLS를 종료하거나 certificate validation이 포함된 `SslStream`을 적용한다.

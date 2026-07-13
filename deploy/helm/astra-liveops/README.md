@@ -1,8 +1,8 @@
-# ASTRA Helm chart
+# ASTRA Helm 배포
 
-The chart deploys the API, Orleans silos, TCP gateway, Outbox worker, and Blazor Admin. PostgreSQL is the source of truth; Redis is optional. A pre-install/pre-upgrade Job applies the versioned PostgreSQL schema before workloads roll out.
+이 chart는 API, Orleans Silo, TCP Gateway, Outbox Worker와 Blazor Admin을 배포한다. PostgreSQL은 source of truth이며 Redis는 선택적 가속 계층이다. Pre-install/pre-upgrade Job이 workload rollout 전에 versioned PostgreSQL schema를 적용한다.
 
-Create the referenced Secret without committing values:
+값을 commit하지 않고 chart가 참조하는 Secret을 생성한다.
 
 ```powershell
 kubectl -n astra create secret generic astra-liveops-secrets `
@@ -11,18 +11,18 @@ kubectl -n astra create secret generic astra-liveops-secrets `
   --from-literal=tcp-signing-key='<at least 32 bytes>'
 ```
 
-Render and validate locally:
+로컬 render와 검증 명령은 다음과 같다.
 
 ```powershell
 helm lint deploy/helm/astra-liveops
 helm template astra deploy/helm/astra-liveops --namespace astra
 ```
 
-The chart does not create databases, Redis, public DNS, TLS, or secrets. Those remain platform-owned resources.
+Chart는 database, Redis, public DNS, TLS와 Secret을 생성하지 않는다. 해당 resource는 platform이 소유한다.
 
-The TCP Gateway defaults to an internal `ClusterIP` because its local listener is plaintext. Expose it only through a trusted TLS-capable L4 proxy or load balancer; changing the Service to `LoadBalancer` without TLS termination is not a production configuration.
+TCP Gateway는 plaintext local listener를 사용하므로 내부 `ClusterIP`가 기본값이다. 외부 노출 시 TLS를 지원하는 신뢰된 L4 proxy 또는 load balancer를 사용한다.
 
-For production OIDC, configure both API token validation and the Admin BFF client:
+운영 OIDC에서는 API token 검증과 Admin BFF client를 함께 설정한다.
 
 ```yaml
 global:
@@ -43,4 +43,4 @@ components:
         roleClaimType: roles
 ```
 
-Add `admin-oidc-client-secret` to the existing Secret. In this mode `liveops-signing-key` is not consumed by the API. The provider must issue a stable `sub`, an Admin role claim in the identity token, and the same LiveOps role in the API access token.
+기존 Secret에 `admin-oidc-client-secret`을 추가한다. 이 mode에서 API는 `liveops-signing-key`를 사용하지 않는다. Provider는 안정적인 `sub`, identity token의 Admin role claim과 API access token의 동일한 LiveOps role을 발급해야 한다.

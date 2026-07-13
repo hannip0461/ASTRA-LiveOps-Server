@@ -17,9 +17,9 @@ $solution = Join-Path $root 'Astra.LiveOps.slnx'
 $composeFile = Join-Path $root 'deploy\docker-compose.yml'
 $runtimeDirectory = Join-Path $root 'tmp-runtime\demo'
 $evidenceDirectory = Join-Path $root 'output\demo'
-$evidencePath = Join-Path $evidenceDirectory 'portfolio-demo-evidence.json'
-$summaryPath = Join-Path $evidenceDirectory 'portfolio-demo-summary.md'
-$tcpLogPath = Join-Path $evidenceDirectory 'portfolio-demo-tcp-e2e.log'
+$evidencePath = Join-Path $evidenceDirectory 'integrated-demo-evidence.json'
+$summaryPath = Join-Path $evidenceDirectory 'integrated-demo-summary.md'
+$tcpLogPath = Join-Path $evidenceDirectory 'integrated-demo-tcp-e2e.log'
 $postgresConnection = 'Host=localhost;Port=54329;Database=astra;Username=astra;Password=astra_dev_password'
 $apiBaseUrl = 'http://127.0.0.1:5191'
 $adminBaseUrl = 'http://127.0.0.1:5500'
@@ -228,7 +228,7 @@ $commonEnvironment = @{
 }
 $orleansEnvironment = $commonEnvironment.Clone()
 $orleansEnvironment['Astra__Orleans__ClusterProvider'] = 'AdoNet'
-$orleansEnvironment['Astra__Orleans__ClusterId'] = 'astra-portfolio-demo'
+$orleansEnvironment['Astra__Orleans__ClusterId'] = 'astra-integrated-demo'
 $orleansEnvironment['Astra__Orleans__ServiceId'] = 'astra-liveops'
 $orleansEnvironment['ConnectionStrings__Orleans'] = $postgresConnection
 
@@ -335,7 +335,7 @@ $outboxBefore = Invoke-AstraJson -Method Get -Path '/api/admin/outbox/overview' 
 
 $runStartedAt = [DateTimeOffset]::UtcNow
 $suffix = "$($runStartedAt.ToString('yyyyMMddHHmmss'))-$([Guid]::NewGuid().ToString('N').Substring(0, 6))"
-$version = "portfolio-demo-$suffix"
+$version = "integrated-demo-$suffix"
 $bannerId = "pickup-demo-$suffix"
 $playerId = [Guid]::NewGuid()
 $incidentId = "incident-demo-$suffix"
@@ -344,7 +344,7 @@ $now = [DateTimeOffset]::UtcNow
 
 $publish = Invoke-AstraJson -Method Post -Path '/api/admin/content/publish' -Headers $authorized -Body @{
     version = $version
-    reason = 'portfolio-demo-content-publish'
+    reason = 'integrated-demo-content-publish'
     gachaBanners = @(
         @{
             bannerId = $bannerId
@@ -386,7 +386,7 @@ $grantKey = "grant-demo-$suffix"
 $grant = Invoke-AstraJson -Method Post -Path "/api/players/$playerId/wallet/grant" -Headers $authorized -Body @{
     currency = 2
     amount = 500
-    reason = 'portfolio-demo-seed'
+    reason = 'integrated-demo-seed'
     idempotencyKey = $grantKey
     requestHash = 'server-calculates-request-hash'
 }
@@ -411,11 +411,11 @@ Assert-Demo -Condition ($drawResult.contentVersion -eq $version) -Message 'Gacha
 $mail = Invoke-AstraJson -Method Post -Path '/api/admin/mail/incident' -Headers $authorized -Body @{
     incidentId = $incidentId
     mailId = $mailId
-    title = 'Portfolio demo incident compensation'
+    title = 'Incident compensation'
     body = 'Compensation for the affected gacha request.'
     targetPlayerIds = @($playerId)
     rewards = @(@{ currency = 2; amount = 200 })
-    reason = 'portfolio-demo-compensation'
+    reason = 'integrated-demo-compensation'
 }
 Assert-Demo -Condition ($mail.mailId -eq $mailId) -Message 'Incident mail was not created.'
 $target = Invoke-AstraJson `
@@ -512,7 +512,7 @@ $evidence = [ordered]@{
     tcp = [ordered]@{
         crossTransportReplayVerified = $tcpVerified
         skipped = [bool]$SkipTcpVerification
-        log = if ($SkipTcpVerification) { $null } else { 'output/demo/portfolio-demo-tcp-e2e.log' }
+        log = if ($SkipTcpVerification) { $null } else { 'output/demo/integrated-demo-tcp-e2e.log' }
     }
     checks = [ordered]@{
         contentPublishAndActivation = $true
@@ -530,29 +530,29 @@ $evidence = [ordered]@{
     ($evidence | ConvertTo-Json -Depth 12),
     [Text.UTF8Encoding]::new($false))
 $summary = @"
-# ASTRA Portfolio Demo Evidence
+# ASTRA 통합 데모 결과
 
-- Run: $suffix
-- Completed: $($evidence.completedAtUtc.ToString('O'))
-- Active content: $version
-- Player: $playerId
+- 실행 ID: $suffix
+- 완료 시각(UTC): $($evidence.completedAtUtc.ToString('O'))
+- 활성 콘텐츠: $version
+- 플레이어: $playerId
 
-| Verification | Result |
+| 검증 항목 | 결과 |
 |---|---:|
-| Gacha retry executed once | PASS |
-| Exact gacha response replay | PASS |
-| Incident target snapshot | PASS |
-| Mail retry paid once | PASS |
-| Final Elif balance (500 - 100 + 200) | $($evidence.player.finalElifBalance) |
-| Required audit actions | PASS |
-| Outbox published delta | $($evidence.operations.outboxPublishedDelta) |
-| HTTP/TCP cross-transport replay | $(if ($tcpVerified) { 'PASS' } elseif ($SkipTcpVerification) { 'SKIPPED' } else { 'FAIL' }) |
+| 가챠 재시도 실제 실행 1회 | PASS |
+| 동일 가챠 응답 replay | PASS |
+| 사고 대상 snapshot | PASS |
+| 우편 재시도 실제 지급 1회 | PASS |
+| 최종 엘리프 잔액 (500 - 100 + 200) | $($evidence.player.finalElifBalance) |
+| 필수 감사 작업 | PASS |
+| Outbox 발행 증가량 | $($evidence.operations.outboxPublishedDelta) |
+| HTTP/TCP 교차 transport replay | $(if ($tcpVerified) { 'PASS' } elseif ($SkipTcpVerification) { 'SKIPPED' } else { 'FAIL' }) |
 
-Runtime: [Admin]($adminBaseUrl) | [API readiness]($apiBaseUrl/health/ready)
+실행 주소: [Admin]($adminBaseUrl) | [API 준비 상태]($apiBaseUrl/health/ready)
 "@
 [IO.File]::WriteAllText($summaryPath, $summary, [Text.UTF8Encoding]::new($false))
 
-Write-Host "PASS: ASTRA portfolio demo completed."
+Write-Host "PASS: ASTRA integrated demo completed."
 Write-Host "Evidence: $evidencePath"
 Write-Host "Admin: $adminBaseUrl"
 

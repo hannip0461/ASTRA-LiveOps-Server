@@ -14,7 +14,7 @@ variable "location" {
 variable "environment" {
   description = "Short environment name."
   type        = string
-  default     = "portfolio"
+  default     = "astra"
 
   validation {
     condition     = can(regex("^[a-z0-9-]{2,12}$", var.environment))

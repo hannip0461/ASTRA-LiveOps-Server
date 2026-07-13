@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "runId": "20260712141001-359df1",
-  "startedAtUtc": "2026-07-12T14:10:01.3154107+00:00",
-  "completedAtUtc": "2026-07-12T14:10:01.6571711+00:00",
+  "runId": "20260713003438-3372c6",
+  "startedAtUtc": "2026-07-13T00:34:38.6724492+00:00",
+  "completedAtUtc": "2026-07-13T00:34:39.4987932+00:00",
   "runtime": {
     "api": "http://127.0.0.1:5191",
     "admin": "http://127.0.0.1:5500",
@@ -11,13 +11,13 @@
     "tcpGatewayPort": 5300
   },
   "content": {
-    "version": "portfolio-demo-20260712141001-359df1",
-    "checksum": "9d75c59d0dd86dbd8c731faeac908b74f38daac45f378730de565aa6fdfb37f2",
-    "bannerId": "pickup-demo-20260712141001-359df1",
+    "version": "integrated-demo-20260713003438-3372c6",
+    "checksum": "7e5ddf2b8348fb8554b7720cc9a307464ae025843492411b68e0ae9e1ec81841",
+    "bannerId": "pickup-demo-20260713003438-3372c6",
     "active": true
   },
   "player": {
-    "playerId": "8560bb33-b85c-4972-8d18-9dfab03cfe9f",
+    "playerId": "677aa59b-4023-4dc5-98b8-4d2f6e290cc9",
     "initialGrant": 500,
     "gachaCost": 100,
     "compensation": 200,
@@ -28,8 +28,8 @@
     "firstRequestReplayed": false,
     "retryReplayed": true,
     "exactResponseReplay": true,
-    "contentVersion": "portfolio-demo-20260712141001-359df1",
-    "contentChecksum": "9d75c59d0dd86dbd8c731faeac908b74f38daac45f378730de565aa6fdfb37f2",
+    "contentVersion": "integrated-demo-20260713003438-3372c6",
+    "contentChecksum": "7e5ddf2b8348fb8554b7720cc9a307464ae025843492411b68e0ae9e1ec81841",
     "rewards": [
       {
         "rewardId": "character-standard-demo",
@@ -39,8 +39,8 @@
     ]
   },
   "compensation": {
-    "incidentId": "incident-demo-20260712141001-359df1",
-    "mailId": "mail-demo-20260712141001-359df1",
+    "incidentId": "incident-demo-20260713003438-3372c6",
+    "mailId": "mail-demo-20260713003438-3372c6",
     "targetSnapshotMatched": true,
     "firstClaimReplayed": false,
     "retryReplayed": true,
@@ -55,14 +55,14 @@
       "mail.claim"
     ],
     "matchingAuditRows": 1,
-    "outboxPublishedDelta": 3,
-    "outboxPending": 3,
+    "outboxPublishedDelta": 6,
+    "outboxPending": 0,
     "outboxDeadLetters": 1
   },
   "tcp": {
     "crossTransportReplayVerified": true,
     "skipped": false,
-    "log": "output/demo/portfolio-demo-tcp-e2e.log"
+    "log": "output/demo/integrated-demo-tcp-e2e.log"
   },
   "checks": {
     "contentPublishAndActivation": true,

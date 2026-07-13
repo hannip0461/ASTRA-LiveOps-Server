@@ -1,6 +1,6 @@
-# Observability Runtime
+# 관측성 구성
 
-## Pipeline
+## Telemetry 흐름
 
 ```text
 Astra.Api / Astra.TcpGateway / Astra.Silo / Astra.Worker
@@ -10,25 +10,25 @@ Astra.Api / Astra.TcpGateway / Astra.Silo / Astra.Worker
   -> Kibana dashboard and alert rules
 ```
 
-The self-managed path uses Elastic's EDOT Collector rather than sending SDK data directly to a legacy APM Server endpoint. The `elasticapm` processor and connector enrich traces and derive the metrics required by Elastic's APM views. The Elasticsearch exporter preserves OTel field names with `mapping.mode: otel`.
+Self-managed 환경은 SDK data를 legacy APM Server endpoint에 직접 전송하지 않고 Elastic EDOT Collector를 사용한다. `elasticapm` processor와 connector가 trace를 보강하고 Elastic APM 화면에 필요한 metric을 생성한다. Elasticsearch exporter는 `mapping.mode: otel`로 OTel field name을 유지한다.
 
-Application Counter instruments use delta temporality. Alert windows therefore evaluate new failures in the window instead of repeatedly matching a process-lifetime cumulative value.
+Application Counter는 delta temporality를 사용한다. Alert window는 process lifetime 누적값이 아니라 해당 구간에 새로 발생한 오류를 평가한다.
 
-## Local Resource Boundary
+## 로컬 자원 제한
 
-The entire stack is profile-gated and never starts with the PostgreSQL core profile.
+Observability stack은 별도 profile로 분리하며 PostgreSQL core profile과 함께 자동 시작하지 않는다.
 
-- Elastic Stack components are pinned to `9.4.2`.
-- Elasticsearch telemetry data uses a `1 GiB` `tmpfs`; it never writes to an unbounded named volume.
-- Kibana's local data directory uses a separate `128 MiB` `tmpfs`.
-- Container memory limits are 1280 MiB for Elasticsearch, 1024 MiB for Kibana, and 384 MiB for EDOT.
-- Every container log uses 10 MiB files with three-file rotation.
-- Data stream retention defaults to one hour, is capped at two hours, and rolls over after 15 minutes or 64 MiB.
-- The three pinned amd64 images total about 1.89 GiB compressed. Images are fixed-cost layers; runtime telemetry disappears when the containers are removed.
+- Elastic Stack image version: `9.4.2`
+- Elasticsearch telemetry: 1 GiB `tmpfs`
+- Kibana local data: 128 MiB `tmpfs`
+- Memory limit: Elasticsearch 1280 MiB, Kibana 1024 MiB, EDOT 384 MiB
+- Container log: 10 MiB 파일 3개 rotation
+- Data stream retention: 기본 1시간, 최대 2시간
+- Rollover: 15분 또는 64 MiB
 
-This is a local portfolio profile. Security is disabled on loopback-only Elasticsearch/Kibana ports. Production requires TLS, API-key authentication, durable capacity planning, and an external retention policy.
+로컬 Elasticsearch/Kibana는 loopback port에서만 security를 비활성화한다. 운영 환경은 TLS, API key 인증, 지속 가능한 capacity와 별도 retention 정책을 적용해야 한다.
 
-## Run And Verify
+## 실행과 검증
 
 ```powershell
 ./scripts/observability/Start-Observability.ps1
@@ -36,35 +36,35 @@ This is a local portfolio profile. Security is disabled on loopback-only Elastic
 ./scripts/observability/Test-OperationalScenarios.ps1
 ```
 
-The test is end to end, not a container health check. It:
+`Test-Observability.ps1`은 container health check를 넘어 다음 E2E를 검증한다.
 
-1. emits a real OTLP trace and metric from `Astra.ObservabilityProbe`;
-2. verifies both OTel-native data streams through ES|QL;
-3. applies bounded lifecycle settings;
-4. provisions the ASTRA dashboard through Kibana's Dashboards API;
-5. provisions the PostgreSQL pool-timeout rule with a stable rule ID;
-6. emits one explicitly tagged synthetic timeout metric;
-7. waits until Kibana reports an active alert and verifies the dashboard by ID.
+1. `Astra.ObservabilityProbe`가 실제 OTLP trace와 metric을 전송한다.
+2. ES|QL로 OTel-native data stream 2개를 확인한다.
+3. 제한된 lifecycle 설정을 적용한다.
+4. Kibana Dashboards API로 ASTRA dashboard를 생성한다.
+5. 안정적인 rule ID로 PostgreSQL pool-timeout rule을 생성한다.
+6. 구분 가능한 synthetic timeout metric을 한 건 전송한다.
+7. Kibana active alert와 dashboard ID를 확인한다.
 
-`Test-OperationalScenarios.ps1` then runs two real fault scenarios:
+`Test-OperationalScenarios.ps1`은 실제 장애 시나리오 2개를 실행한다.
 
-1. a two-slot PostgreSQL pool is exhausted, one acquisition times out within its budget, and a query succeeds after the held connections are released;
-2. one valid and one invalid Outbox event are consumed by the running Worker, proving `published`, bounded retry, `dead_letter`, and alert activation.
+1. Connection 2개인 PostgreSQL pool을 포화시켜 한 번의 획득 timeout과 connection 반환 후 query 회복을 검증한다.
+2. 정상 Outbox event와 잘못된 event를 Worker가 처리하도록 해 `published`, bounded retry, `dead_letter`와 alert를 검증한다.
 
-The script calculates the 99.9% acquisition-SLO burn rate from delta `attempts` and `failures`. It writes the isolated run result to `output/evidence/operational-scenarios.json`; the probe ID is also the OTel `service.instance.id`, so prior telemetry cannot inflate the evidence.
+Script는 delta `attempts`, `failures`로 99.9% acquisition SLO burn rate를 계산하고 `output/evidence/operational-scenarios.json`에 결과를 저장한다. Probe ID를 OTel `service.instance.id`로 사용해 이전 telemetry가 결과에 섞이지 않게 한다.
 
-Application services export to the same gateway when started with:
+Application service의 OTLP endpoint는 다음과 같이 지정한다.
 
 ```powershell
 $env:Astra__OpenTelemetry__OtlpEndpoint='http://127.0.0.1:4317'
 ```
 
-Kibana is available at `http://127.0.0.1:5609`. The dashboard URL is printed by both test scripts.
+Kibana 주소는 `http://127.0.0.1:5609`이며 test script가 dashboard URL을 출력한다.
 
-## Stop Without Growth
+## 종료
 
 ```powershell
 ./scripts/observability/Stop-Observability.ps1
 ```
 
-The stop script removes only the three observability containers and their ephemeral mounts. It leaves PostgreSQL, its named volume, and the pinned image layers untouched. No prune command is executed implicitly.
+Stop script는 observability container 3개와 ephemeral mount만 제거한다. PostgreSQL, named volume과 image layer는 변경하지 않는다.

@@ -1,8 +1,8 @@
-# Azure foundation with Terraform
+# Terraform 기반 Azure 인프라
 
-Terraform owns the Azure foundation: resource group, VNet, private AKS, ACR, Log Analytics, and private PostgreSQL Flexible Server. Pulumi owns only the Helm application release, preventing dual ownership.
+Terraform은 resource group, VNet, private AKS, ACR, Log Analytics와 private PostgreSQL Flexible Server를 소유한다. Pulumi는 Helm application release만 소유해 resource 이중 관리를 방지한다.
 
-State and secrets are external inputs. Initialize with an Azure Storage backend configuration, then supply the password through the environment:
+State와 secret은 외부 입력으로 관리한다. Azure Storage backend 설정으로 초기화한 뒤 password를 환경 변수로 전달한다.
 
 ```powershell
 $env:TF_VAR_unique_suffix = "replace1"
@@ -12,4 +12,4 @@ terraform -chdir=deploy/terraform init -backend-config=backend.hcl
 terraform -chdir=deploy/terraform plan
 ```
 
-No cloud resource is created by CI; CI runs formatting and validation only.
+CI는 formatting과 validation만 수행하며 cloud resource를 생성하지 않는다.

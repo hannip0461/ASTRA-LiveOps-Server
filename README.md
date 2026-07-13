@@ -8,11 +8,11 @@
 
 | 콘텐츠 배포와 롤백 | 사고 대상자 보상 |
 |---|---|
-| [![콘텐츠 운영 화면](output/playwright/01-content-ops.png)](output/playwright/01-content-ops.png) | [![사고 보상 화면](output/playwright/02-incident-mail.png)](output/playwright/02-incident-mail.png) |
+| [![콘텐츠 운영 화면](output/screenshots/01-content-ops.png)](output/screenshots/01-content-ops.png) | [![사고 보상 화면](output/screenshots/02-incident-mail.png)](output/screenshots/02-incident-mail.png) |
 | **운영 감사 로그** | **Outbox 운영** |
-| [![감사 로그 화면](output/playwright/03-audit-log.png)](output/playwright/03-audit-log.png) | [![Outbox 운영 화면](output/playwright/04-outbox-operations.png)](output/playwright/04-outbox-operations.png) |
+| [![감사 로그 화면](output/screenshots/03-audit-log.png)](output/screenshots/03-audit-log.png) | [![Outbox 운영 화면](output/screenshots/04-outbox-operations.png)](output/screenshots/04-outbox-operations.png) |
 | **Kibana 관측성** | **운영 상태 Dashboard** |
-| [![Kibana 관측성 화면](output/playwright/astra-observability-dashboard.png)](output/playwright/astra-observability-dashboard.png) | [![운영 상태 화면](output/playwright/astra-operational-dashboard.png)](output/playwright/astra-operational-dashboard.png) |
+| [![Kibana 관측성 화면](output/screenshots/astra-observability-dashboard.png)](output/screenshots/astra-observability-dashboard.png) | [![운영 상태 화면](output/screenshots/astra-operational-dashboard.png)](output/screenshots/astra-operational-dashboard.png) |
 
 ## 프로젝트 개요
 
@@ -124,7 +124,7 @@ Dockerfile              Multi-target production images
 
 ```powershell
 dotnet build Astra.LiveOps.slnx
-pwsh -File scripts/demo/Run-PortfolioDemo.ps1
+pwsh -File scripts/demo/Run-IntegratedDemo.ps1
 ```
 
 데모는 가챠 replay, 콘텐츠 사고 대상 snapshot, Incident Mail 보상, audit/Outbox와 HTTP/TCP replay를 검증하고 `output/demo`에 실행 증빙을 남긴다.
@@ -173,15 +173,15 @@ dotnet build deploy/pulumi/Astra.LiveOps.Deploy.csproj -c Release
 
 | 산출물 | 내용 |
 |---|---|
-| [프로젝트 종합 문서](docs/portfolio/ASTRA_LiveOps_Portfolio.pdf) | 문제 정의, 설계 결정, 파이프라인과 검증 결과 |
-| [아키텍처 도식 모음](docs/portfolio/ASTRA_LiveOps_Architecture_Diagrams.pdf) | 런타임, transaction, 콘텐츠, 복구, Outbox와 배포 흐름 |
-| [통합 데모 결과](output/demo/portfolio-demo-summary.md) | 실행 시나리오와 검증 결과 요약 |
-| [데모 증빙 JSON](output/demo/portfolio-demo-evidence.json) | 자동 검증 가능한 실행 결과 |
-| [운영 화면 원본](output/playwright/README.md) | Admin 및 Kibana 화면 6종 |
+| [프로젝트 종합 문서](docs/project/ASTRA_LiveOps_Project_Overview.pdf) | 문제 정의, 설계 결정, 파이프라인과 검증 결과 |
+| [아키텍처 도식 모음](docs/project/ASTRA_LiveOps_Architecture_Diagrams.pdf) | 런타임, transaction, 콘텐츠, 복구, Outbox와 배포 흐름 |
+| [통합 데모 결과](output/demo/integrated-demo-summary.md) | 실행 시나리오와 검증 결과 요약 |
+| [데모 증빙 JSON](output/demo/integrated-demo-evidence.json) | 자동 검증 가능한 실행 결과 |
+| [운영 화면 원본](output/screenshots/README.md) | Admin 및 Kibana 화면 6종 |
 | [GitHub Actions CI](https://github.com/hannip0461/ASTRA-LiveOps-Server/actions/workflows/ci.yml) | build, test, E2E, IaC 검증과 Docker image 발행 |
 | [GHCR Docker images](https://github.com/hannip0461?tab=packages) | API, Admin, Silo, TCP Gateway, Worker image |
 
-### Docker images
+### Docker 이미지
 
 - [`api`](https://github.com/hannip0461/ASTRA-LiveOps-Server/pkgs/container/astra-liveops-api): `ghcr.io/hannip0461/astra-liveops-api:latest`
 - [`admin`](https://github.com/hannip0461/ASTRA-LiveOps-Server/pkgs/container/astra-liveops-admin): `ghcr.io/hannip0461/astra-liveops-admin:latest`
