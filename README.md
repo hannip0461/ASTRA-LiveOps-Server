@@ -1,22 +1,20 @@
 # ASTRA LiveOps Server
 
-.NET 10과 Microsoft Orleans로 구현한 수집형 RPG LiveOps 서버다. 가챠·재화·천장 처리의 데이터 정합성과 콘텐츠 배포 사고의 추적·복구를 실제 코드, 운영 도구와 장애 테스트로 검증한다.
+.NET 10과 Microsoft Orleans로 구현한 수집형 RPG LiveOps 서버입니다. 네트워크 재시도와 동시 요청에서도 가챠·재화·천장 상태를 일관되게 유지하고, 콘텐츠 배포 사고의 추적·롤백·대상자 보상까지 운영 화면과 장애 테스트로 검증합니다.
 
 [![CI](https://github.com/hannip0461/ASTRA-LiveOps-Server/actions/workflows/ci.yml/badge.svg)](https://github.com/hannip0461/ASTRA-LiveOps-Server/actions/workflows/ci.yml)
 
 ## 주요 화면
 
-| 콘텐츠 배포와 롤백 | 사고 대상자 보상 |
-|---|---|
-| [![콘텐츠 운영 화면](output/screenshots/01-content-ops.png)](output/screenshots/01-content-ops.png) | [![사고 보상 화면](output/screenshots/02-incident-mail.png)](output/screenshots/02-incident-mail.png) |
-| **운영 감사 로그** | **Outbox 운영** |
-| [![감사 로그 화면](output/screenshots/03-audit-log.png)](output/screenshots/03-audit-log.png) | [![Outbox 운영 화면](output/screenshots/04-outbox-operations.png)](output/screenshots/04-outbox-operations.png) |
-| **Kibana 관측성** | **운영 상태 Dashboard** |
-| [![Kibana 관측성 화면](output/screenshots/astra-observability-dashboard.png)](output/screenshots/astra-observability-dashboard.png) | [![운영 상태 화면](output/screenshots/astra-operational-dashboard.png)](output/screenshots/astra-operational-dashboard.png) |
+| 콘텐츠 배포와 롤백 | 사고 대상자 보상 | 운영 감사 로그 |
+|---|---|---|
+| [![콘텐츠 운영 화면](output/screenshots/01-content-ops.png)](output/screenshots/01-content-ops.png) | [![사고 보상 화면](output/screenshots/02-incident-mail.png)](output/screenshots/02-incident-mail.png) | [![감사 로그 화면](output/screenshots/03-audit-log.png)](output/screenshots/03-audit-log.png) |
+| **Outbox 운영** | **Kibana 관측성** | **운영 상태 대시보드** |
+| [![Outbox 운영 화면](output/screenshots/04-outbox-operations.png)](output/screenshots/04-outbox-operations.png) | [![Kibana 관측성 화면](output/screenshots/astra-observability-dashboard.png)](output/screenshots/astra-observability-dashboard.png) | [![운영 상태 화면](output/screenshots/astra-operational-dashboard.png)](output/screenshots/astra-operational-dashboard.png) |
 
 ## 프로젝트 개요
 
-수집형 RPG에서는 네트워크 재시도, 동시 명령과 콘텐츠 운영 실수가 재화·보상 오류로 이어질 수 있다. ASTRA는 플레이어별 명령 경계, 원자적 DB transaction과 운영 복구 절차를 하나의 실행 가능한 서버로 구성한다.
+수집형 RPG에서는 네트워크 재시도, 동시 명령과 콘텐츠 운영 실수가 재화·보상 오류로 이어질 수 있습니다. ASTRA는 플레이어별 명령 직렬화, PostgreSQL 원자적 트랜잭션과 운영 복구 절차를 하나의 실행 가능한 서버로 구성합니다.
 
 | 영역 | 구현 결과 |
 |---|---|
