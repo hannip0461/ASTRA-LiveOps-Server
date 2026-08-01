@@ -10,14 +10,9 @@ namespace Astra.IntegrationTests;
 [Collection(PostgresPoolTelemetryCollection.Name)]
 public sealed class PostgresPoolSaturationTests
 {
-    [Fact]
+    [RequiresEnvironmentFact("ASTRA_RUN_POSTGRES_TESTS")]
     public async Task ExhaustedPool_FailsWithinTimeout_EmitsMetric_AndRecovers()
     {
-        if (!ShouldRunPostgresTests())
-        {
-            return;
-        }
-
         var failureReasons = new ConcurrentBag<string>();
         long attemptCount = 0;
         using var listener = ListenForAcquireMetrics(
@@ -46,14 +41,9 @@ public sealed class PostgresPoolSaturationTests
         Assert.Equal(4, Volatile.Read(ref attemptCount));
     }
 
-    [Fact]
+    [RequiresEnvironmentFact("ASTRA_RUN_POSTGRES_TESTS")]
     public async Task BoundedPool_QueuesConcurrentBurst_WithoutExceedingLimit()
     {
-        if (!ShouldRunPostgresTests())
-        {
-            return;
-        }
-
         const int maximumPoolSize = 4;
         var applicationName = $"Astra.PoolBurst.{Guid.NewGuid():N}";
         await using var dataSource = CreateDataSource(
@@ -158,12 +148,6 @@ public sealed class PostgresPoolSaturationTests
     private static string ConnectionString() =>
         Environment.GetEnvironmentVariable("ASTRA_POSTGRES_CONNECTION")
         ?? "Host=localhost;Port=54329;Database=astra;Username=astra;Password=astra_dev_password";
-
-    private static bool ShouldRunPostgresTests() =>
-        string.Equals(
-            Environment.GetEnvironmentVariable("ASTRA_RUN_POSTGRES_TESTS"),
-            "1",
-            StringComparison.Ordinal);
 }
 
 [CollectionDefinition(PostgresPoolTelemetryCollection.Name, DisableParallelization = true)]

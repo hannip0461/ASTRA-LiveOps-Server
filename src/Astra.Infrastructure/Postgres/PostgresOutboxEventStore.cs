@@ -7,6 +7,8 @@ namespace Astra.Infrastructure.Postgres;
 
 public sealed class PostgresOutboxEventStore(NpgsqlDataSource dataSource) : IOutboxEventStore
 {
+    public const string LeaseExpiredError = "outbox_lease_expired";
+
     public async Task<IReadOnlyList<OutboxEventRecord>> LeaseBatchAsync(
         string workerId,
         int batchSize,
@@ -19,17 +21,45 @@ public sealed class PostgresOutboxEventStore(NpgsqlDataSource dataSource) : IOut
 
         await using var connection = await dataSource.OpenConnectionObservedAsync(cancellationToken);
 
-        await connection.ExecuteAsync(new CommandDefinition(
+        // 만료된 lease를 실패 횟수에 포함해 반복 장애가 dead-letter로 수렴하도록 한다.
+        var reclaimed = await connection.ExecuteAsync(new CommandDefinition(
             """
-            UPDATE outbox_events
-            SET status = 'pending',
+            WITH expired AS (
+                SELECT event_id
+                FROM outbox_events
+                WHERE status = 'processing'
+                  AND lease_until < now()
+                ORDER BY lease_until
+                LIMIT @ReclaimLimit
+                FOR UPDATE SKIP LOCKED
+            )
+            UPDATE outbox_events AS outbox
+            SET attempts = outbox.attempts + 1,
+                status = CASE
+                    WHEN outbox.attempts + 1 >= outbox.max_attempts THEN 'dead_letter'
+                    ELSE 'pending'
+                END,
+                available_at = CASE
+                    WHEN outbox.attempts + 1 >= outbox.max_attempts THEN outbox.available_at
+                    ELSE now()
+                END,
+                last_error = @LeaseExpiredError,
+                dead_lettered_at = CASE
+                    WHEN outbox.attempts + 1 >= outbox.max_attempts THEN now()
+                    ELSE NULL
+                END,
                 leased_by = NULL,
-                lease_until = NULL,
-                available_at = now()
-            WHERE status = 'processing'
-              AND lease_until < now();
+                lease_until = NULL
+            FROM expired
+            WHERE outbox.event_id = expired.event_id;
             """,
+            new
+            {
+                ReclaimLimit = Math.Max(1, batchSize),
+                LeaseExpiredError = LeaseExpiredError
+            },
             cancellationToken: cancellationToken));
+        activity?.SetTag("outbox.reclaimed_count", reclaimed);
 
         var events = await connection.QueryAsync<OutboxEventRow>(new CommandDefinition(
             """

@@ -82,6 +82,28 @@ public sealed class ContentValidationTests
     }
 
     [Fact]
+    public void ValidateAndCreateSnapshot_ProducesStableChecksumForEquivalentInstantsInAnotherOffset()
+    {
+        var startsAtUtc = new DateTimeOffset(2026, 7, 11, 0, 0, 0, TimeSpan.Zero);
+        var endsAtUtc = startsAtUtc.AddDays(1);
+        var startsAtKst = startsAtUtc.ToOffset(TimeSpan.FromHours(9));
+        var endsAtKst = endsAtUtc.ToOffset(TimeSpan.FromHours(9));
+
+        Assert.Equal(startsAtUtc, startsAtKst);
+        Assert.Equal(endsAtUtc, endsAtKst);
+
+        var service = new ContentValidationService();
+        var asUtc = service.ValidateAndCreateSnapshot(new PublishContentCommand(
+            "content-a",
+            [NewBanner("pickup-a", startsAtUtc, endsAtUtc)]));
+        var asKst = service.ValidateAndCreateSnapshot(new PublishContentCommand(
+            "content-a",
+            [NewBanner("pickup-a", startsAtKst, endsAtKst)]));
+
+        Assert.Equal(asUtc.Snapshot!.Checksum, asKst.Snapshot!.Checksum);
+    }
+
+    [Fact]
     public void ValidateAndCreateSnapshot_WithInvalidRewardPool_ReturnsSpecificIssues()
     {
         var now = DateTimeOffset.UtcNow;

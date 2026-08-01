@@ -218,8 +218,9 @@ public sealed class ContentValidationService(TimeProvider? timeProvider = null)
                     x.CostCurrency,
                     x.CostAmount,
                     x.PityThreshold,
-                    x.StartsAtUtc,
-                    x.EndsAtUtc,
+                    // 같은 시각을 나타내는 UTC offset은 hash 전에 정규화한다.
+                    startsAtUtc = x.StartsAtUtc.ToUnixTimeMilliseconds(),
+                    endsAtUtc = x.EndsAtUtc.ToUnixTimeMilliseconds(),
                     rewardPool = x.RewardPool
                         .OrderBy(entry => entry.Kind)
                         .ThenBy(entry => entry.RewardId, StringComparer.Ordinal)

@@ -22,7 +22,7 @@
 | 영속 정합성 | PostgreSQL transaction, ledger, audit와 completed response replay |
 | 운영 복구 | immutable content snapshot, rollback, 영향 대상 snapshot과 Incident Mail |
 | 운영 가시성 | Blazor Admin, Transactional Outbox, OpenTelemetry와 Kibana Dashboard |
-| 검증 | 표준 테스트 91건, PostgreSQL 테스트 17건, 2-Silo 및 HTTP/TCP E2E |
+| 검증 | 전체 테스트 108건 통과 (단위 76, 동시성 1, 실패 주입 2, 통합 29). 실제 PostgreSQL, HTTP/TCP E2E 포함 |
 
 ## 핵심 시나리오
 
@@ -125,7 +125,7 @@ dotnet build Astra.LiveOps.slnx
 pwsh -File scripts/demo/Run-IntegratedDemo.ps1
 ```
 
-데모는 가챠 replay, 콘텐츠 사고 대상 snapshot, Incident Mail 보상, audit/Outbox와 HTTP/TCP replay를 검증하고 `output/demo`에 실행 증빙을 남긴다.
+데모는 가챠 replay, 콘텐츠 사고 대상 snapshot, Incident Mail 보상, audit/Outbox와 HTTP/TCP replay를 검증하고 `output/demo`에 실행 결과를 남긴다.
 
 </details>
 
@@ -171,10 +171,11 @@ dotnet build deploy/pulumi/Astra.LiveOps.Deploy.csproj -c Release
 
 | 산출물 | 내용 |
 |---|---|
+| [OpenAPI 문서](openapi.json) | HTTP 엔드포인트 19개와 스키마 14개의 OpenAPI 3.1 계약 |
 | [프로젝트 종합 문서](docs/project/ASTRA_LiveOps_Project_Overview.pdf) | 문제 정의, 설계 결정, 파이프라인과 검증 결과 |
 | [아키텍처 도식 모음](docs/project/ASTRA_LiveOps_Architecture_Diagrams.pdf) | 런타임, transaction, 콘텐츠, 복구, Outbox와 배포 흐름 |
 | [통합 데모 결과](output/demo/integrated-demo-summary.md) | 실행 시나리오와 검증 결과 요약 |
-| [데모 증빙 JSON](output/demo/integrated-demo-evidence.json) | 자동 검증 가능한 실행 결과 |
+| [데모 결과 JSON](output/demo/integrated-demo-evidence.json) | 자동 검증 가능한 실행 결과 |
 | [운영 화면 원본](output/screenshots/README.md) | Admin 및 Kibana 화면 6종 |
 | [GitHub Actions CI](https://github.com/hannip0461/ASTRA-LiveOps-Server/actions/workflows/ci.yml) | build, test, E2E, IaC 검증과 Docker image 발행 |
 | [GHCR Docker images](https://github.com/hannip0461?tab=packages) | API, Admin, Silo, TCP Gateway, Worker image |

@@ -36,6 +36,7 @@ public sealed class InMemoryPlayerAccountStore : IPlayerAccountStore
             {
                 workingState.ClearPendingGachaDraws();
                 workingState.ClearPendingOutboxEvents();
+                workingState.ClearPendingCompletedRequests();
                 slot.State = workingState;
             }
 

@@ -3,6 +3,8 @@ name: CI
 on:
   push:
     branches: [main]
+    # 아래 semver 이미지 태그는 태그 참조에서만 생성된다.
+    tags: ['v*']
   pull_request:
 
 jobs:
@@ -174,9 +176,12 @@ jobs:
           tags: |
             type=raw,value=latest
             type=sha,prefix=sha-
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.description=ASTRA LiveOps Server ${{ matrix.target }} image
+            org.opencontainers.image.licenses=MIT
       - uses: docker/build-push-action@v7
         with:
           context: .

@@ -12,17 +12,9 @@ namespace Astra.IntegrationTests;
 [Collection(EndToEndCollection.Name)]
 public sealed class TcpGatewayEndToEndTests
 {
-    [Fact]
+    [RequiresEnvironmentFact("ASTRA_RUN_TCP_E2E")]
     public async Task HttpAndTcpPaths_UseSameGrainState_AndReconnectReplays()
     {
-        if (!string.Equals(
-                Environment.GetEnvironmentVariable("ASTRA_RUN_TCP_E2E"),
-                "1",
-                StringComparison.Ordinal))
-        {
-            return;
-        }
-
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
         using var http = ApiE2E.Client();
         await ApiE2E.AuthenticateAsync(http, "local-supervisor", timeout.Token);
@@ -204,6 +196,12 @@ public sealed class TcpGatewayEndToEndTests
         return response.Wallet;
     }
 
+    // Windows가 Hyper-V 또는 WSL용으로 기본 포트를 예약할 수 있다.
+    private static int GatewayPort() =>
+        int.TryParse(Environment.GetEnvironmentVariable("ASTRA_TCP_PORT"), out var port) && port is > 0 and <= 65535
+            ? port
+            : 5300;
+
     private static async Task<BoundClient> ConnectAndBindAsync(
         Guid playerId,
         string token,
@@ -213,7 +211,7 @@ public sealed class TcpGatewayEndToEndTests
         var client = new TcpClient();
         try
         {
-            await client.ConnectAsync(IPAddress.Loopback, 5300, cancellationToken);
+            await client.ConnectAsync(IPAddress.Loopback, GatewayPort(), cancellationToken);
             var response = await SendAsync(
                 client.GetStream(),
                 new RequestEnvelope

@@ -213,6 +213,71 @@ public sealed class TcpRequestProcessorTests
     }
 
     [Fact]
+    public async Task InsufficientCurrency_OverTcp_ReturnsFixedMessageWithoutBalance()
+    {
+        var domainFailure = Assert.Throws<InsufficientCurrencyException>(() =>
+            new PlayerAccountCommandProcessor().Spend(
+                new PlayerAccountState(Guid.NewGuid()),
+                new SpendCurrencyCommand(CurrencyCode.Elif, 100, "draw", "idem-1", "hash-1")));
+        Assert.Contains("current=0", domainFailure.Message, StringComparison.Ordinal);
+
+        var harness = CreateHarness();
+        var session = new TcpSessionContext();
+        var token = harness.TokenService.Issue(harness.PlayerId, harness.Clock.GetUtcNow().AddMinutes(10));
+        var bind = await harness.Processor.ProcessAsync(
+            BindRequest("bind-1", harness.PlayerId, token),
+            session,
+            CancellationToken.None);
+        harness.PlayerService.NextDrawException = domainFailure;
+
+        var response = await harness.Processor.ProcessAsync(
+            DrawRequest("draw-1", bind.SessionId, "draw-key"),
+            session,
+            CancellationToken.None);
+
+        Assert.Equal(ResponseStatus.FailedPrecondition, response.Status);
+        Assert.Equal("insufficient_currency", response.ErrorCode);
+        Assert.Equal(
+            "The account does not have enough currency for this command.",
+            response.ErrorMessage);
+        Assert.DoesNotContain("current=", response.ErrorMessage, StringComparison.Ordinal);
+        Assert.DoesNotContain("required=", response.ErrorMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task DomainRejection_OverTcp_NeverEchoesExceptionText()
+    {
+        var failures = new Exception[]
+        {
+            new InsufficientCurrencyException("Insufficient Elif: current=7, required=100."),
+            new IdempotencyConflictException("Same Idempotency-Key was reused with a different request hash."),
+            new InvalidAccountCommandException("Draw count must be between 1 and 10."),
+            new ContentUnavailableException("No active snapshot for banner pickup-a."),
+            new ContentMismatchException("Requested checksum checksum-b is not active.")
+        };
+
+        foreach (var failure in failures)
+        {
+            var harness = CreateHarness();
+            var session = new TcpSessionContext();
+            var token = harness.TokenService.Issue(harness.PlayerId, harness.Clock.GetUtcNow().AddMinutes(10));
+            var bind = await harness.Processor.ProcessAsync(
+                BindRequest("bind-1", harness.PlayerId, token),
+                session,
+                CancellationToken.None);
+            harness.PlayerService.NextDrawException = failure;
+
+            var response = await harness.Processor.ProcessAsync(
+                DrawRequest("draw-1", bind.SessionId, "draw-key"),
+                session,
+                CancellationToken.None);
+
+            Assert.NotEmpty(response.ErrorCode);
+            Assert.NotEqual(failure.Message, response.ErrorMessage);
+        }
+    }
+
+    [Fact]
     public async Task RequestId_WithControlCharacter_IsRejectedWithoutLoggableEcho()
     {
         var harness = CreateHarness();
@@ -298,6 +363,8 @@ public sealed class TcpRequestProcessorTests
 
         public int WalletCalls { get; private set; }
 
+        public Exception? NextDrawException { get; set; }
+
         public List<Astra.Contracts.DrawGachaRequest> DrawRequests { get; } = [];
 
         public Task<WalletSnapshotDto> GetWalletAsync(Guid requestedPlayerId, CancellationToken cancellationToken)
@@ -314,6 +381,12 @@ public sealed class TcpRequestProcessorTests
         {
             Assert.Equal(playerId, requestedPlayerId);
             DrawRequests.Add(request);
+            if (NextDrawException is { } failure)
+            {
+                NextDrawException = null;
+                throw failure;
+            }
+
             if (_completed.TryGetValue(request.IdempotencyKey, out var completed))
             {
                 if (!StringComparer.Ordinal.Equals(completed.RequestHash, request.RequestHash))

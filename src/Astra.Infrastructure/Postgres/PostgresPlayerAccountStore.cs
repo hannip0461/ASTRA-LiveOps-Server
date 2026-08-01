@@ -17,7 +17,7 @@ public sealed class PostgresPlayerAccountStore(NpgsqlDataSource dataSource) : IP
             transaction: transaction,
             cancellationToken: cancellationToken));
 
-        var state = await LoadStateAsync(connection, transaction, playerId, lockPlayer: false, cancellationToken);
+        var state = await LoadStateAsync(connection, transaction, playerId, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return PlayerAccountCommandProcessor.ToSnapshot(state);
     }
@@ -31,8 +31,7 @@ public sealed class PostgresPlayerAccountStore(NpgsqlDataSource dataSource) : IP
         await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
 
         await EnsurePlayerLockedAsync(connection, transaction, playerId, cancellationToken);
-        var state = await LoadStateAsync(connection, transaction, playerId, lockPlayer: false, cancellationToken);
-        var knownIdempotencyKeys = state.CompletedRequests.Keys.ToHashSet(StringComparer.Ordinal);
+        var state = await LoadStateAsync(connection, transaction, playerId, cancellationToken);
         var knownClaimedMailIds = state.ClaimedMailIdempotencyKeys.Keys.ToHashSet(StringComparer.Ordinal);
 
         var receipt = operation(state);
@@ -42,7 +41,6 @@ public sealed class PostgresPlayerAccountStore(NpgsqlDataSource dataSource) : IP
                 connection,
                 transaction,
                 state,
-                knownIdempotencyKeys,
                 knownClaimedMailIds,
                 cancellationToken);
         }
@@ -50,6 +48,7 @@ public sealed class PostgresPlayerAccountStore(NpgsqlDataSource dataSource) : IP
         await transaction.CommitAsync(cancellationToken);
         state.ClearPendingGachaDraws();
         state.ClearPendingOutboxEvents();
+        state.ClearPendingCompletedRequests();
         return receipt;
     }
 
@@ -82,15 +81,10 @@ public sealed class PostgresPlayerAccountStore(NpgsqlDataSource dataSource) : IP
         NpgsqlConnection connection,
         NpgsqlTransaction? transaction,
         Guid playerId,
-        bool lockPlayer,
         CancellationToken cancellationToken)
     {
-        var existsSql = lockPlayer
-            ? "SELECT player_id FROM players WHERE player_id = @PlayerId FOR UPDATE;"
-            : "SELECT player_id FROM players WHERE player_id = @PlayerId;";
-
         var exists = await connection.ExecuteScalarAsync<Guid?>(new CommandDefinition(
-            existsSql,
+            "SELECT player_id FROM players WHERE player_id = @PlayerId;",
             new { PlayerId = playerId },
             transaction,
             cancellationToken: cancellationToken));
@@ -106,6 +100,7 @@ public sealed class PostgresPlayerAccountStore(NpgsqlDataSource dataSource) : IP
         var state = new PlayerAccountState(playerId, ledgerVersion);
         if (exists is null)
         {
+            state.MarkHydrated();
             return state;
         }
 
@@ -188,7 +183,7 @@ public sealed class PostgresPlayerAccountStore(NpgsqlDataSource dataSource) : IP
 
         foreach (var row in idempotency)
         {
-            state.AddCompletedRequest(new CompletedIdempotencyRequest(
+            state.HydrateCompletedRequest(new CompletedIdempotencyRequest(
                 row.IdempotencyKey,
                 row.RequestHash,
                 row.ResponseBody,
@@ -212,6 +207,7 @@ public sealed class PostgresPlayerAccountStore(NpgsqlDataSource dataSource) : IP
             state.MarkMailClaimed(row.MailId, row.IdempotencyKey);
         }
 
+        state.MarkHydrated();
         return state;
     }
 
@@ -219,11 +215,10 @@ public sealed class PostgresPlayerAccountStore(NpgsqlDataSource dataSource) : IP
         NpgsqlConnection connection,
         NpgsqlTransaction transaction,
         PlayerAccountState state,
-        HashSet<string> knownIdempotencyKeys,
         HashSet<string> knownClaimedMailIds,
         CancellationToken cancellationToken)
     {
-        foreach (var balance in state.Balances)
+        foreach (var balance in state.ChangedBalances)
         {
             await connection.ExecuteAsync(new CommandDefinition(
                 """
@@ -237,7 +232,7 @@ public sealed class PostgresPlayerAccountStore(NpgsqlDataSource dataSource) : IP
                 cancellationToken: cancellationToken));
         }
 
-        foreach (var item in state.Inventory)
+        foreach (var item in state.ChangedInventory)
         {
             await connection.ExecuteAsync(new CommandDefinition(
                 """
@@ -251,7 +246,7 @@ public sealed class PostgresPlayerAccountStore(NpgsqlDataSource dataSource) : IP
                 cancellationToken: cancellationToken));
         }
 
-        foreach (var character in state.Characters.Values)
+        foreach (var character in state.ChangedCharacters)
         {
             await connection.ExecuteAsync(new CommandDefinition(
                 """
@@ -273,7 +268,7 @@ public sealed class PostgresPlayerAccountStore(NpgsqlDataSource dataSource) : IP
                 cancellationToken: cancellationToken));
         }
 
-        foreach (var pity in state.PityByBanner)
+        foreach (var pity in state.ChangedPity)
         {
             await connection.ExecuteAsync(new CommandDefinition(
                 """
@@ -362,10 +357,8 @@ public sealed class PostgresPlayerAccountStore(NpgsqlDataSource dataSource) : IP
                 cancellationToken: cancellationToken));
         }
 
-        var newRequests = state.CompletedRequests.Values
-            .Where(request => !knownIdempotencyKeys.Contains(request.IdempotencyKey));
-
-        foreach (var request in newRequests)
+        // 만료된 키를 다시 처리하면 같은 transaction에서 응답을 교체한다.
+        foreach (var request in state.PendingCompletedRequests)
         {
             await connection.ExecuteAsync(new CommandDefinition(
                 """
@@ -384,7 +377,13 @@ public sealed class PostgresPlayerAccountStore(NpgsqlDataSource dataSource) : IP
                     @ResponseBody,
                     @SnapshotBody,
                     @CompletedAt,
-                    @ExpiresAt);
+                    @ExpiresAt)
+                ON CONFLICT (player_id, idempotency_key)
+                DO UPDATE SET request_hash = EXCLUDED.request_hash,
+                              response_body = EXCLUDED.response_body,
+                              snapshot_body = EXCLUDED.snapshot_body,
+                              completed_at = EXCLUDED.completed_at,
+                              expires_at = EXCLUDED.expires_at;
                 """,
                 new
                 {

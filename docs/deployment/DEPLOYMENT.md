@@ -47,8 +47,7 @@ TCP Gateway도 기본적으로 `ClusterIP`를 사용한다. Application listener
 ## 검증 결과
 
 - Release build: warning 0, error 0
-- 표준 테스트: 91건 통과
-- PostgreSQL 테스트: 17건 통과
+- 전체 테스트: 108건 통과
 - ADO.NET cluster: Active Silo membership row 2개
 - ADO.NET membership 기반 HTTP/TCP E2E: 4건 통과
 - Helm lint/render: resource 11개

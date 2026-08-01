@@ -96,6 +96,37 @@ public sealed class PlayerAccountCommandProcessorTests
         Assert.Empty(state.CompletedRequests);
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(-500)]
+    public void Spend_WithNonPositiveAmount_IsRejectedAndLeavesBalanceUntouched(long amount)
+    {
+        var state = new PlayerAccountState(Guid.NewGuid());
+        var processor = new PlayerAccountCommandProcessor();
+        processor.Grant(state, new GrantCurrencyCommand(CurrencyCode.Elif, 100, "seed", "idem-seed", "hash-seed"));
+
+        Assert.Throws<InvalidAccountCommandException>(() =>
+            processor.Spend(state, new SpendCurrencyCommand(CurrencyCode.Elif, amount, "draw", "idem-1", "hash-1")));
+
+        Assert.Equal(100, state.GetBalance(CurrencyCode.Elif));
+        Assert.Single(state.Ledger);
+        Assert.DoesNotContain("idem-1", state.CompletedRequests.Keys);
+    }
+
+    [Fact]
+    public void Spend_WithUndefinedCurrency_IsRejected()
+    {
+        var state = new PlayerAccountState(Guid.NewGuid());
+        var processor = new PlayerAccountCommandProcessor();
+
+        Assert.Throws<InvalidAccountCommandException>(() =>
+            processor.Spend(state, new SpendCurrencyCommand((CurrencyCode)99, 10, "draw", "idem-1", "hash-1")));
+
+        Assert.Empty(state.Ledger);
+        Assert.Empty(state.CompletedRequests);
+    }
+
     [Fact]
     public void ClaimMail_WithSameIdempotencyKey_ReplaysStoredResponse()
     {

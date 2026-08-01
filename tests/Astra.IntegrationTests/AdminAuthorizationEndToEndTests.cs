@@ -7,17 +7,9 @@ namespace Astra.IntegrationTests;
 [Collection(EndToEndCollection.Name)]
 public sealed class AdminAuthorizationEndToEndTests
 {
-    [Fact]
+    [RequiresEnvironmentFact("ASTRA_RUN_API_E2E")]
     public async Task AdminRoutes_EnforceRoleMatrix_AndPersistAuditActor()
     {
-        if (!string.Equals(
-                Environment.GetEnvironmentVariable("ASTRA_RUN_API_E2E"),
-                "1",
-                StringComparison.Ordinal))
-        {
-            return;
-        }
-
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
         using var anonymous = ApiE2E.Client();
         Assert.Equal(

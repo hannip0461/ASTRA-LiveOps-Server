@@ -37,7 +37,6 @@ public sealed class PlayerAccountCommandProcessor(
             command.RequestHash,
             () =>
             {
-                ValidateCurrencyDelta(command.Currency, command.Amount);
                 SpendCurrency(state, command.Currency, command.Amount, command.Reason, command.IdempotencyKey);
                 return ToSnapshot(state);
             },
@@ -507,6 +506,7 @@ public sealed class PlayerAccountCommandProcessor(
         string reason,
         string idempotencyKey)
     {
+        ValidateCurrencyDelta(currency, amount);
         var current = state.GetBalance(currency);
         if (current < amount)
         {

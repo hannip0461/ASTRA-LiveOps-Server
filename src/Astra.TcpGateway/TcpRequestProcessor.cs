@@ -59,23 +59,53 @@ internal sealed class TcpRequestProcessor(
         }
         catch (IdempotencyConflictException exception)
         {
-            response = DomainError(request, session, ResponseStatus.Conflict, "idempotency_conflict", exception);
+            response = DomainError(
+                request,
+                session,
+                ResponseStatus.Conflict,
+                "idempotency_conflict",
+                "The idempotency key was already used for a different command.",
+                exception);
         }
         catch (InvalidAccountCommandException exception)
         {
-            response = DomainError(request, session, ResponseStatus.InvalidRequest, "command_invalid", exception);
+            response = DomainError(
+                request,
+                session,
+                ResponseStatus.InvalidRequest,
+                "command_invalid",
+                "The command violates a domain rule.",
+                exception);
         }
         catch (InsufficientCurrencyException exception)
         {
-            response = DomainError(request, session, ResponseStatus.FailedPrecondition, "insufficient_currency", exception);
+            response = DomainError(
+                request,
+                session,
+                ResponseStatus.FailedPrecondition,
+                "insufficient_currency",
+                "The account does not have enough currency for this command.",
+                exception);
         }
         catch (ContentUnavailableException exception)
         {
-            response = DomainError(request, session, ResponseStatus.FailedPrecondition, "content_unavailable", exception);
+            response = DomainError(
+                request,
+                session,
+                ResponseStatus.FailedPrecondition,
+                "content_unavailable",
+                "No active content snapshot can serve this command.",
+                exception);
         }
         catch (ContentMismatchException exception)
         {
-            response = DomainError(request, session, ResponseStatus.FailedPrecondition, "content_mismatch", exception);
+            response = DomainError(
+                request,
+                session,
+                ResponseStatus.FailedPrecondition,
+                "content_mismatch",
+                "The requested content is not active.",
+                exception);
         }
         catch (Exception exception)
         {
@@ -237,14 +267,16 @@ internal sealed class TcpRequestProcessor(
         TcpSessionContext session,
         ResponseStatus status,
         string errorCode,
+        string clientMessage,
         Exception exception)
     {
         logger.LogWarning(
+            exception,
             "TCP domain request rejected. RequestId={RequestId} Command={Command} ErrorCode={ErrorCode}",
             request.RequestId,
             request.CommandCase,
             errorCode);
-        return Error(request.RequestId, session.SessionId, status, errorCode, exception.Message);
+        return Error(request.RequestId, session.SessionId, status, errorCode, clientMessage);
     }
 
     private static ResponseEnvelope Error(

@@ -8,17 +8,9 @@ namespace Astra.IntegrationTests;
 [Collection(EndToEndCollection.Name)]
 public sealed class ApiBoundaryEndToEndTests
 {
-    [Fact]
+    [RequiresEnvironmentFact("ASTRA_RUN_API_E2E")]
     public async Task ApiBoundary_ReturnsProblemDetails_AndRateLimitsByActor()
     {
-        if (!string.Equals(
-                Environment.GetEnvironmentVariable("ASTRA_RUN_API_E2E"),
-                "1",
-                StringComparison.Ordinal))
-        {
-            return;
-        }
-
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         using var anonymous = ApiE2E.Client();
         using var unauthorized = await anonymous.GetAsync(

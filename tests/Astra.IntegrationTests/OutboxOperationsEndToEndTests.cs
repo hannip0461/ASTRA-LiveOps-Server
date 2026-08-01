@@ -9,17 +9,9 @@ namespace Astra.IntegrationTests;
 [Collection(EndToEndCollection.Name)]
 public sealed class OutboxOperationsEndToEndTests
 {
-    [Fact]
+    [RequiresEnvironmentFact("ASTRA_RUN_API_E2E")]
     public async Task OutboxRoutes_ProtectPayload_EnforceSupervisor_AndAuditReplay()
     {
-        if (!string.Equals(
-                Environment.GetEnvironmentVariable("ASTRA_RUN_API_E2E"),
-                "1",
-                StringComparison.Ordinal))
-        {
-            return;
-        }
-
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
         var connectionString = Environment.GetEnvironmentVariable("ASTRA_POSTGRES_CONNECTION")
             ?? "Host=localhost;Port=54329;Database=astra;Username=astra;Password=astra_dev_password";

@@ -70,3 +70,21 @@ Worker는 `Astra.LiveOps` trace와 다음 low-cardinality metric을 전송한다
 - `astra.persistence.cleanup.failures`
 
 Metric tag는 event type과 outcome으로 제한한다. Event ID와 aggregate ID는 trace/log field에만 기록한다.
+
+## 쓰기 증폭 벤치마크
+
+`tests/Astra.IntegrationTests/WriteAmplificationBenchmark.cs`는 재화 지급 명령 하나가 기록하는 행 수가 플레이어 보유 자산 수에 비례하지 않는지 측정한다. `SaveStateAsync`가 변경분만 기록하는지 확인하는 회귀 가드이기도 하다.
+
+`ASTRA_RUN_BENCHMARK=1`이 없으면 건너뛴다. 일반 테스트 실행에는 영향이 없다.
+
+```powershell
+docker compose -f deploy/docker-compose.yml --profile core up -d postgres
+$env:ASTRA_RUN_BENCHMARK = '1'
+$env:ASTRA_POSTGRES_CONNECTION = 'Host=localhost;Port=54329;Database=astra_bench;Username=astra;Password=astra_dev_password'
+dotnet test tests/Astra.IntegrationTests/Astra.IntegrationTests.csproj -c Release `
+    --filter WriteAmplificationBenchmark
+```
+
+행 기록 수는 `pg_stat_user_tables`의 `n_tup_ins`와 `n_tup_upd`를 각 구간 앞뒤로 읽어 차분한다. `pg_stat_reset()`을 쓰지 않으므로 superuser 권한이 필요 없다. 다른 세션이 같은 데이터베이스에 쓰면 수치가 오염되므로 전용 데이터베이스를 쓴다.
+
+측정값은 실행 환경에 따라 달라진다. 절대 지연이 아니라 **명령당 행 수가 보유 자산 수와 무관하게 유지되는지**가 판정 대상이다.

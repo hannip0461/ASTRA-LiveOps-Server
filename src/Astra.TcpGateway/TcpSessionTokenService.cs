@@ -1,3 +1,4 @@
+using System.Buffers.Text;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Options;
@@ -44,7 +45,7 @@ internal sealed class TcpSessionTokenService(
         byte[] suppliedSignature;
         try
         {
-            suppliedSignature = FromBase64Url(parts[2]);
+            suppliedSignature = Base64Url.DecodeFromChars(parts[2]);
         }
         catch (FormatException)
         {
@@ -66,16 +67,6 @@ internal sealed class TcpSessionTokenService(
     private string Sign(string payload)
     {
         using var hmac = new HMACSHA256(_signingKey);
-        return ToBase64Url(hmac.ComputeHash(Encoding.UTF8.GetBytes(payload)));
-    }
-
-    private static string ToBase64Url(byte[] value) =>
-        Convert.ToBase64String(value).TrimEnd('=').Replace('+', '-').Replace('/', '_');
-
-    private static byte[] FromBase64Url(string value)
-    {
-        var padded = value.Replace('-', '+').Replace('_', '/');
-        padded += new string('=', (4 - padded.Length % 4) % 4);
-        return Convert.FromBase64String(padded);
+        return Base64Url.EncodeToString(hmac.ComputeHash(Encoding.UTF8.GetBytes(payload)));
     }
 }

@@ -12,14 +12,9 @@ namespace Astra.IntegrationTests;
 
 public sealed class PostgresContentSnapshotStoreTests
 {
-    [Fact]
+    [RequiresEnvironmentFact("ASTRA_RUN_POSTGRES_TESTS")]
     public async Task SchemaInitializer_SerializesConcurrentMigrationAttempts()
     {
-        if (!ShouldRunPostgresTests())
-        {
-            return;
-        }
-
         await using var dataSource = NpgsqlDataSource.Create(ConnectionString());
         await Task.WhenAll(
             Enumerable.Range(0, 4)
@@ -30,14 +25,9 @@ public sealed class PostgresContentSnapshotStoreTests
             "SELECT to_regclass('public.content_snapshots') IS NOT NULL;"));
     }
 
-    [Fact]
+    [RequiresEnvironmentFact("ASTRA_RUN_POSTGRES_TESTS")]
     public async Task PublishAndActivate_PersistImmutableSnapshots()
     {
-        if (!ShouldRunPostgresTests())
-        {
-            return;
-        }
-
         await using var dataSource = NpgsqlDataSource.Create(ConnectionString());
         await new PostgresSchemaInitializer(dataSource).ApplyAsync();
         await ClearContentAsync(dataSource);
@@ -64,14 +54,9 @@ public sealed class PostgresContentSnapshotStoreTests
             () => restartedStore.PublishAsync(first with { Checksum = "different" }));
     }
 
-    [Fact]
+    [RequiresEnvironmentFact("ASTRA_RUN_POSTGRES_TESTS")]
     public async Task ConcurrentPublish_WithSameVersionAndDifferentChecksums_CommitsOneWinner()
     {
-        if (!ShouldRunPostgresTests())
-        {
-            return;
-        }
-
         await using var dataSource = NpgsqlDataSource.Create(ConnectionString());
         await new PostgresSchemaInitializer(dataSource).ApplyAsync();
         await ClearContentAsync(dataSource);
@@ -93,14 +78,9 @@ public sealed class PostgresContentSnapshotStoreTests
         Assert.Equal(1, await CountSnapshotsAsync(dataSource));
     }
 
-    [Fact]
+    [RequiresEnvironmentFact("ASTRA_RUN_POSTGRES_TESTS")]
     public async Task ConcurrentPublishAndRollback_SerializeActivePointerChanges()
     {
-        if (!ShouldRunPostgresTests())
-        {
-            return;
-        }
-
         await using var dataSource = NpgsqlDataSource.Create(ConnectionString());
         await new PostgresSchemaInitializer(dataSource).ApplyAsync();
         await ClearContentAsync(dataSource);
@@ -126,14 +106,9 @@ public sealed class PostgresContentSnapshotStoreTests
         Assert.Equal(3, await CountSnapshotsAsync(dataSource));
     }
 
-    [Fact]
+    [RequiresEnvironmentFact("ASTRA_RUN_POSTGRES_TESTS")]
     public async Task Synchronizer_UpdatesIndependentSiloCaches_AndReconcilesMissedNotification()
     {
-        if (!ShouldRunPostgresTests())
-        {
-            return;
-        }
-
         await using var dataSource = NpgsqlDataSource.Create(ConnectionString());
         await new PostgresSchemaInitializer(dataSource).ApplyAsync();
         await ClearContentAsync(dataSource);
@@ -258,7 +233,4 @@ public sealed class PostgresContentSnapshotStoreTests
     private static string ConnectionString() =>
         Environment.GetEnvironmentVariable("ASTRA_POSTGRES_CONNECTION")
         ?? "Host=localhost;Port=54329;Database=astra;Username=astra;Password=astra_dev_password";
-
-    private static bool ShouldRunPostgresTests() =>
-        string.Equals(Environment.GetEnvironmentVariable("ASTRA_RUN_POSTGRES_TESTS"), "1", StringComparison.Ordinal);
 }

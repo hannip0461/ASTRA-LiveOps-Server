@@ -7,14 +7,9 @@ namespace Astra.IntegrationTests;
 
 public sealed class PostgresOperationAuditStoreTests
 {
-    [Fact]
+    [RequiresEnvironmentFact("ASTRA_RUN_POSTGRES_TESTS")]
     public async Task StartAndComplete_PersistAuthenticatedOperationLifecycle()
     {
-        if (!ShouldRunPostgresTests())
-        {
-            return;
-        }
-
         await using var dataSource = NpgsqlDataSource.Create(ConnectionString());
         await new PostgresSchemaInitializer(dataSource).ApplyAsync();
         var store = new PostgresOperationAuditStore(dataSource);
@@ -65,7 +60,4 @@ public sealed class PostgresOperationAuditStoreTests
     private static string ConnectionString() =>
         Environment.GetEnvironmentVariable("ASTRA_POSTGRES_CONNECTION")
         ?? "Host=localhost;Port=54329;Database=astra;Username=astra;Password=astra_dev_password";
-
-    private static bool ShouldRunPostgresTests() =>
-        string.Equals(Environment.GetEnvironmentVariable("ASTRA_RUN_POSTGRES_TESTS"), "1", StringComparison.Ordinal);
 }

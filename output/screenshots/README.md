@@ -1,4 +1,4 @@
-# 운영 화면 증빙
+# 운영 화면
 
 - Admin viewport: `1440 x 1000`
 - Mobile QA viewport: `390 x 844`

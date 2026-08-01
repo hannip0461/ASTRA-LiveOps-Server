@@ -4,5 +4,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AnalysisLevel>latest</AnalysisLevel>
     <LangVersion>preview</LangVersion>
+    <!-- 권장 분석 규칙 결과는 docs/quality/STATIC_ANALYSIS.md에 정리한다. -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
 </Project>

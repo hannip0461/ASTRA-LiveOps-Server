@@ -34,21 +34,22 @@ EXPOSE 8080
 USER $APP_UID
 ENTRYPOINT ["dotnet", "Astra.Admin.dll"]
 
-FROM mcr.microsoft.com/dotnet/runtime:10.0.9 AS silo
+# Astra.Infrastructure가 사용하는 Microsoft.AspNetCore.App 공유 프레임워크를 포함한다.
+FROM mcr.microsoft.com/dotnet/aspnet:10.0.9 AS silo
 WORKDIR /app
 COPY --from=publish-silo /app/publish .
 EXPOSE 11111 30000
 USER $APP_UID
 ENTRYPOINT ["dotnet", "Astra.Silo.dll"]
 
-FROM mcr.microsoft.com/dotnet/runtime:10.0.9 AS tcp-gateway
+FROM mcr.microsoft.com/dotnet/aspnet:10.0.9 AS tcp-gateway
 WORKDIR /app
 COPY --from=publish-tcp-gateway /app/publish .
 EXPOSE 5300
 USER $APP_UID
 ENTRYPOINT ["dotnet", "Astra.TcpGateway.dll"]
 
-FROM mcr.microsoft.com/dotnet/runtime:10.0.9 AS worker
+FROM mcr.microsoft.com/dotnet/aspnet:10.0.9 AS worker
 WORKDIR /app
 COPY --from=publish-worker /app/publish .
 USER $APP_UID

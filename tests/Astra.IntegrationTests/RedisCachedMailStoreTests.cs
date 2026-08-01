@@ -39,14 +39,9 @@ public sealed class RedisCachedMailStoreTests
         Assert.False(await store.IsTargetAsync(mailId, Guid.NewGuid()));
     }
 
-    [Fact]
+    [RequiresEnvironmentFact("ASTRA_RUN_REDIS_TESTS")]
     public async Task IsTargetAsync_WithRedis_UsesCachedTargetSnapshot()
     {
-        if (!ShouldRunRedisTests())
-        {
-            return;
-        }
-
         var connectionString = Environment.GetEnvironmentVariable("ASTRA_REDIS_CONNECTION")
             ?? "localhost:6389";
 
@@ -75,7 +70,4 @@ public sealed class RedisCachedMailStoreTests
         Assert.True(await store.IsTargetAsync(mailId, playerId));
         Assert.False(await store.IsTargetAsync(mailId, Guid.NewGuid()));
     }
-
-    private static bool ShouldRunRedisTests() =>
-        string.Equals(Environment.GetEnvironmentVariable("ASTRA_RUN_REDIS_TESTS"), "1", StringComparison.Ordinal);
 }
