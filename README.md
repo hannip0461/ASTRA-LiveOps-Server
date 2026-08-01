@@ -6,11 +6,29 @@
 
 ## 주요 화면
 
-| 콘텐츠 배포와 롤백 | 사고 대상자 보상 | 운영 감사 로그 |
-|---|---|---|
-| [![콘텐츠 운영 화면](output/screenshots/01-content-ops.png)](output/screenshots/01-content-ops.png) | [![사고 보상 화면](output/screenshots/02-incident-mail.png)](output/screenshots/02-incident-mail.png) | [![감사 로그 화면](output/screenshots/03-audit-log.png)](output/screenshots/03-audit-log.png) |
-| **Outbox 운영** | **Kibana 관측성** | **운영 상태 대시보드** |
-| [![Outbox 운영 화면](output/screenshots/04-outbox-operations.png)](output/screenshots/04-outbox-operations.png) | [![Kibana 관측성 화면](output/screenshots/astra-observability-dashboard.png)](output/screenshots/astra-observability-dashboard.png) | [![운영 상태 화면](output/screenshots/astra-operational-dashboard.png)](output/screenshots/astra-operational-dashboard.png) |
+### 콘텐츠 배포와 롤백
+
+[![콘텐츠 운영 화면](output/screenshots/01-content-ops.png)](output/screenshots/01-content-ops.png)
+
+### 사고 대상자 보상
+
+[![사고 보상 화면](output/screenshots/02-incident-mail.png)](output/screenshots/02-incident-mail.png)
+
+### 운영 감사 로그
+
+[![감사 로그 화면](output/screenshots/03-audit-log.png)](output/screenshots/03-audit-log.png)
+
+### Outbox 전달 현황
+
+[![Outbox 전달 현황 화면](output/screenshots/04-outbox-operations.png)](output/screenshots/04-outbox-operations.png)
+
+### 운영 상태 대시보드
+
+[![운영 상태 대시보드](output/screenshots/astra-operational-dashboard.png)](output/screenshots/astra-operational-dashboard.png)
+
+### Kibana 관측 대시보드
+
+[![Kibana 관측 대시보드](output/screenshots/astra-observability-dashboard.png)](output/screenshots/astra-observability-dashboard.png)
 
 ## 프로젝트 개요
 
