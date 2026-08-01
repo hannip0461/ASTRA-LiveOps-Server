@@ -6,11 +6,11 @@
 
 ## 주요 화면
 
-### 콘텐츠 배포와 롤백
+### 콘텐츠 배포 및 롤백
 
 [![콘텐츠 운영 화면](output/screenshots/01-content-ops.png)](output/screenshots/01-content-ops.png)
 
-**운영 흐름:** 콘텐츠 배포와 롤백 → 영향 대상 확정 → 사고 보상 → 감사 로그와 Outbox → 지표와 경보 확인
+**운영 흐름:** 콘텐츠 배포 및 롤백 → 영향 대상 확정 → 사고 보상 우편 → 감사 로그 및 Outbox → 지표와 경보 확인
 
 ## 프로젝트 개요
 
@@ -36,11 +36,11 @@
 
 ## 운영 화면 상세
 
-### 사고 대상자 보상
+### 사고 보상 우편
 
-[![사고 보상 화면](output/screenshots/02-incident-mail.png)](output/screenshots/02-incident-mail.png)
+[![사고 보상 우편 화면](output/screenshots/02-incident-mail.png)](output/screenshots/02-incident-mail.png)
 
-### 운영 감사 로그
+### 운영 작업 감사 로그
 
 [![감사 로그 화면](output/screenshots/03-audit-log.png)](output/screenshots/03-audit-log.png)
 
@@ -65,7 +65,7 @@
 | Orleans Silo | 플레이어별 명령 직렬화와 콘텐츠 control plane |
 | PostgreSQL | 상태, 원장, 감사, 멱등 응답, 콘텐츠와 Outbox의 source of truth |
 | Redis | 사고 보상 대상 membership과 짧은 TTL 조회 가속 |
-| Blazor Admin | 콘텐츠 배포·롤백, 사고 보상, 감사와 Outbox 운영 |
+| Blazor Admin | 콘텐츠 배포 및 롤백, 사고 보상 우편, 감사 로그와 Outbox 운영 |
 | Worker | Outbox lease/retry/dead-letter와 retention cleanup |
 | OpenTelemetry / Elastic | API, TCP, Grain, DB와 Worker trace·metric·alert |
 
