@@ -78,7 +78,7 @@ h1:focus {
 }
 
     .blazor-error-boundary::after {
-        content: "An error has occurred."
+        content: "오류가 발생했습니다."
     }
 
 .darker-border-checkbox.form-check-input {
@@ -217,6 +217,14 @@ h1:focus {
     min-width: 1050px;
 }
 
+.content-table {
+    min-width: 640px;
+}
+
+.content-table th {
+    white-space: nowrap;
+}
+
 .outbox-summary {
     display: grid;
     grid-template-columns: repeat(6, minmax(0, 1fr));
@@ -288,6 +296,10 @@ h1:focus {
     display: flex;
     gap: .5rem;
     align-items: center;
+}
+
+.audit-controls .btn {
+    white-space: nowrap;
 }
 
 .audit-json {

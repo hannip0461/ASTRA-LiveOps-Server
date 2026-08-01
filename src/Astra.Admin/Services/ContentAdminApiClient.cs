@@ -77,7 +77,7 @@ public sealed class ContentAdminApiClient(AdminApiHttpClient httpClient)
     private static ContentPublishResult EmptyResponse() => new(
         false,
         null,
-        [new ContentValidationIssue("api.empty_response", "API returned an empty response.")]);
+        [new ContentValidationIssue("api.empty_response", "API가 빈 응답을 반환했습니다.")]);
 
     private sealed class ValidationProblemResponse
     {

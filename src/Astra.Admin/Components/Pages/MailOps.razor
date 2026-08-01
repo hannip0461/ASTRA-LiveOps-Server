@@ -5,39 +5,39 @@
 @attribute [Authorize]
 @inject MailAdminApiClient ApiClient
 
-<PageTitle>Incident Mail</PageTitle>
+<PageTitle>사고 보상 우편</PageTitle>
 
 <section class="ops-header">
     <div>
-        <p class="eyebrow">Incident Compensation</p>
-        <h1>Targeted mail snapshot</h1>
-        <p class="muted">Manage incident targets, rewards, and claim status.</p>
+        <p class="eyebrow">사고 보상</p>
+        <h1>대상자 우편 스냅샷</h1>
+        <p class="muted">사고 대상자, 보상과 수령 상태를 관리합니다.</p>
     </div>
-    <button class="btn btn-outline-secondary" @onclick="LoadMailAsync" disabled="@busy">Load Mail</button>
+    <button class="btn btn-outline-secondary" @onclick="LoadMailAsync" disabled="@busy">우편 조회</button>
 </section>
 
 <section class="ops-grid">
     <div class="ops-panel">
         <div class="panel-heading">
-            <h2>Create Incident Mail</h2>
-            <span class="status status-draft">Snapshot</span>
+            <h2>사고 보상 우편 생성</h2>
+            <span class="status status-draft">스냅샷</span>
         </div>
 
         <div class="form-grid">
             <label>
-                Incident ID
+                사고 ID
                 <input class="form-control" @bind="draft.IncidentId" />
             </label>
             <label>
-                Mail ID
+                우편 ID
                 <input class="form-control" @bind="draft.MailId" />
             </label>
             <label>
-                Title
+                제목
                 <input class="form-control" @bind="draft.Title" />
             </label>
             <label>
-                Reward
+                보상
                 <div class="input-pair">
                     <select class="form-control" @bind="draft.Currency">
                         @foreach (var currency in Enum.GetNames<CurrencyCode>())
@@ -51,61 +51,61 @@
         </div>
 
         <label class="block-label">
-            Body
+            내용
             <textarea class="form-control" rows="3" @bind="draft.Body"></textarea>
         </label>
 
         <label class="block-label">
-            Operation reason
+            작업 사유
             <input class="form-control" @bind="draft.Reason" />
         </label>
 
         <label class="block-label">
-            Target Player IDs
+            대상 플레이어 ID
             <textarea class="form-control mono" rows="7" @bind="draft.TargetPlayerIds"></textarea>
         </label>
 
         <div class="button-row">
             <AuthorizeView Roles="LiveOpsOperator,LiveOpsSupervisor">
-                <button class="btn btn-primary" @onclick="CreateMailAsync" disabled="@busy">Create Mail</button>
+                <button class="btn btn-primary" @onclick="CreateMailAsync" disabled="@busy">우편 생성</button>
             </AuthorizeView>
-            <button class="btn btn-outline-secondary" @onclick="ResetDraft" disabled="@busy">Reset</button>
+            <button class="btn btn-outline-secondary" @onclick="ResetDraft" disabled="@busy">초기화</button>
         </div>
     </div>
 
     <div class="ops-panel">
         <div class="panel-heading">
-            <h2>Mail Definition</h2>
-            <span class="status @(mail is null ? "status-empty" : "status-live")">@(mail is null ? "Empty" : "Ready")</span>
+            <h2>우편 정의</h2>
+            <span class="status @(mail is null ? "status-empty" : "status-live")">@(mail is null ? "없음" : "준비")</span>
         </div>
 
         <div class="lookup-row">
-            <input class="form-control" placeholder="mail id" @bind="lookupMailId" />
-            <button class="btn btn-outline-secondary" @onclick="LoadMailAsync" disabled="@busy">Find</button>
+            <input class="form-control" placeholder="우편 ID" @bind="lookupMailId" />
+            <button class="btn btn-outline-secondary" @onclick="LoadMailAsync" disabled="@busy">조회</button>
         </div>
 
         @if (mail is null)
         {
-            <p class="muted">No mail definition loaded.</p>
+            <p class="muted">불러온 우편 정의가 없습니다.</p>
         }
         else
         {
             <dl class="snapshot-list">
-                <dt>Mail</dt>
+                <dt>우편 ID</dt>
                 <dd>@mail.MailId</dd>
-                <dt>Incident</dt>
+                <dt>사고 ID</dt>
                 <dd>@mail.IncidentId</dd>
-                <dt>Reason</dt>
+                <dt>사유</dt>
                 <dd>@mail.Reason</dd>
-                <dt>Created</dt>
+                <dt>생성 시각</dt>
                 <dd>@mail.CreatedAt.ToString("u")</dd>
             </dl>
 
             <table class="ops-table">
                 <thead>
                     <tr>
-                        <th>Currency</th>
-                        <th>Amount</th>
+                        <th>재화</th>
+                        <th>수량</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -125,17 +125,17 @@
 <section class="ops-grid">
     <div class="ops-panel">
         <div class="panel-heading">
-            <h2>Target Check</h2>
+            <h2>대상자 확인</h2>
             <span class="status status-warning">Redis / DB</span>
         </div>
         <div class="lookup-row">
-            <input class="form-control" placeholder="player id" @bind="targetPlayerId" />
-            <button class="btn btn-outline-secondary" @onclick="CheckTargetAsync" disabled="@busy">Check</button>
+            <input class="form-control" placeholder="플레이어 ID" @bind="targetPlayerId" />
+            <button class="btn btn-outline-secondary" @onclick="CheckTargetAsync" disabled="@busy">확인</button>
         </div>
         @if (targetCheck is not null)
         {
             <p class="result @(targetCheck.Targeted ? "result-ok" : "result-error")">
-                <strong>@(targetCheck.Targeted ? "Targeted" : "Not targeted")</strong>
+                <strong>@(targetCheck.Targeted ? "대상자" : "대상 아님")</strong>
                 <span class="mono">@targetCheck.PlayerId</span>
             </p>
         }
@@ -143,42 +143,42 @@
 
     <div class="ops-panel">
         <div class="panel-heading">
-            <h2>Claim</h2>
-            <span class="status status-draft">Idempotent</span>
+            <h2>보상 수령</h2>
+            <span class="status status-draft">멱등 처리</span>
         </div>
         <div class="form-grid claim-grid">
             <label>
-                Player ID
+                플레이어 ID
                 <input class="form-control" @bind="claim.PlayerId" />
             </label>
             <label>
-                Idempotency Key
+                멱등성 키
                 <input class="form-control" @bind="claim.IdempotencyKey" />
             </label>
             <label>
-                Request Hash
+                요청 Hash
                 <input class="form-control" @bind="claim.RequestHash" />
             </label>
             <label>
-                Mail ID
+                우편 ID
                 <input class="form-control" @bind="claim.MailId" />
             </label>
         </div>
         <div class="button-row">
             <AuthorizeView Roles="LiveOpsOperator,LiveOpsSupervisor">
-                <button class="btn btn-primary" @onclick="ClaimMailAsync" disabled="@busy">Claim</button>
-                <button class="btn btn-outline-secondary" @onclick="ReplayClaimAsync" disabled="@busy">Replay</button>
+                <button class="btn btn-primary" @onclick="ClaimMailAsync" disabled="@busy">수령</button>
+                <button class="btn btn-outline-secondary" @onclick="ReplayClaimAsync" disabled="@busy">동일 요청 재전송</button>
             </AuthorizeView>
         </div>
 
         @if (receipt is not null)
         {
             <dl class="snapshot-list compact">
-                <dt>Replayed</dt>
-                <dd>@receipt.Replayed</dd>
-                <dt>Ledger</dt>
+                <dt>기존 응답</dt>
+                <dd>@(receipt.Replayed ? "예" : "아니요")</dd>
+                <dt>원장 버전</dt>
                 <dd>@receipt.Snapshot.LedgerVersion</dd>
-                <dt>Wallet</dt>
+                <dt>재화</dt>
                 <dd>@FormatBalances(receipt.Snapshot.Balances)</dd>
             </dl>
         }
@@ -219,7 +219,7 @@
             claim.MailId = mail.MailId;
             targetPlayerId = command.TargetPlayerIds[0].ToString();
             claim.PlayerId = targetPlayerId;
-            message = $"Created mail {mail.MailId}.";
+            message = $"우편을 생성했습니다: {mail.MailId}";
         });
     }
 
@@ -231,13 +231,13 @@
             mail = await ApiClient.GetMailAsync(mailId);
             if (mail is null)
             {
-                Fail($"Mail not found: {mailId}.");
+                Fail($"우편을 찾을 수 없습니다: {mailId}");
                 return;
             }
 
             lookupMailId = mail.MailId;
             claim.MailId = mail.MailId;
-            message = $"Loaded mail {mail.MailId}.";
+            message = $"우편을 불러왔습니다: {mail.MailId}";
         });
     }
 
@@ -247,19 +247,19 @@
         {
             if (!Guid.TryParse(targetPlayerId, out var playerId))
             {
-                Fail("Player ID is not a valid GUID.");
+                Fail("플레이어 ID가 올바른 GUID 형식이 아닙니다.");
                 return;
             }
 
             var mailId = mail?.MailId ?? lookupMailId;
             if (string.IsNullOrWhiteSpace(mailId))
             {
-                Fail("Mail ID is required.");
+                Fail("우편 ID를 입력하세요.");
                 return;
             }
 
             targetCheck = await ApiClient.CheckTargetAsync(mailId, playerId);
-            message = targetCheck.Targeted ? "Target check passed." : "Player is outside the target snapshot.";
+            message = targetCheck.Targeted ? "보상 대상자입니다." : "대상자 스냅샷에 포함되지 않은 플레이어입니다.";
             messageIsError = !targetCheck.Targeted;
         });
     }
@@ -274,20 +274,20 @@
         {
             if (!Guid.TryParse(claim.PlayerId, out var playerId))
             {
-                Fail("Claim Player ID is not a valid GUID.");
+                Fail("수령할 플레이어 ID가 올바른 GUID 형식이 아닙니다.");
                 return;
             }
 
             if (string.IsNullOrWhiteSpace(claim.MailId))
             {
-                Fail("Claim Mail ID is required.");
+                Fail("수령할 우편 ID를 입력하세요.");
                 return;
             }
 
             receipt = await ApiClient.ClaimMailAsync(
                 playerId,
                 new ClaimMailCommand(claim.MailId, claim.IdempotencyKey, claim.RequestHash));
-            message = receipt.Replayed ? "Claim replay returned stored response." : "Mail claimed.";
+            message = receipt.Replayed ? "저장된 수령 응답을 반환했습니다." : "우편 보상을 수령했습니다.";
         });
     }
 
@@ -317,14 +317,14 @@
 
         if (!Enum.TryParse<CurrencyCode>(draft.Currency, out var currency))
         {
-            error = "Reward currency is invalid.";
+            error = "보상 재화가 올바르지 않습니다.";
             return false;
         }
 
         var targetIds = ParsePlayerIds(draft.TargetPlayerIds);
         if (targetIds.Count == 0)
         {
-            error = "At least one target player ID is required.";
+            error = "대상 플레이어 ID를 하나 이상 입력하세요.";
             return false;
         }
 
@@ -348,7 +348,7 @@
 
     private static string FormatBalances(IReadOnlyList<CurrencyBalanceDto> balances) =>
         balances.Count == 0
-            ? "empty"
+            ? "없음"
             : string.Join(", ", balances.Select(balance => $"{balance.Currency}:{balance.Amount}"));
 
     private void ResetDraft()
@@ -397,10 +397,10 @@
             {
                 IncidentId = $"incident-{now:yyyyMMdd-HHmm}",
                 MailId = $"mail-{now:yyyyMMdd-HHmm}",
-                Title = "Incident Compensation",
-                Body = "Compensation for affected gacha requests.",
+                Title = "사고 보상",
+                Body = "영향받은 가챠 요청에 대한 보상입니다.",
                 Amount = 300,
-                Reason = "incident-compensation",
+                Reason = "사고 보상",
                 TargetPlayerIds = playerId.ToString()
             };
         }

@@ -5,18 +5,18 @@
 @using Microsoft.AspNetCore.WebUtilities
 @inject AdminUiAuthOptions Options
 
-<PageTitle>ASTRA Admin Sign In</PageTitle>
+<PageTitle>ASTRA 운영자 로그인</PageTitle>
 
 <main class="sign-in-shell">
     <section class="sign-in-panel">
         <p class="eyebrow">ASTRA LiveOps</p>
-        <h1>Operator sign in</h1>
+        <h1>운영자 로그인</h1>
 
         @if (Options.OpenIdConnect.Enabled)
         {
             <div class="sign-in-options">
                 <a class="btn btn-primary sign-in-button" href="@ExternalSignInUrl">
-                    <strong>Continue with SSO</strong>
+                    <strong>SSO로 계속</strong>
                 </a>
             </div>
         }
@@ -39,7 +39,7 @@
         }
         else
         {
-            <p class="muted">No identity provider is configured.</p>
+            <p class="muted">인증 공급자가 설정되지 않았습니다.</p>
         }
     </section>
 </main>
@@ -62,9 +62,9 @@
 
     private static string OperatorLabel(string operatorId) => operatorId switch
     {
-        "local-viewer" => "Viewer",
-        "local-operator" => "Operator",
-        "local-supervisor" => "Supervisor",
+        "local-viewer" => "조회자",
+        "local-operator" => "운영자",
+        "local-supervisor" => "책임자",
         _ => operatorId
     };
 }

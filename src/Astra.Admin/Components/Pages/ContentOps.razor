@@ -5,140 +5,142 @@
 @attribute [Authorize]
 @inject ContentAdminApiClient ApiClient
 
-<PageTitle>Content Ops</PageTitle>
+<PageTitle>콘텐츠 운영</PageTitle>
 
 <section class="ops-header">
     <div>
-        <p class="eyebrow">LiveOps Content</p>
-        <h1>Content publish and rollback</h1>
-        <p class="muted">Manage active content versions and rollback history.</p>
+        <p class="eyebrow">콘텐츠 운영</p>
+        <h1>콘텐츠 배포 및 롤백</h1>
+        <p class="muted">활성 콘텐츠 버전과 롤백 이력을 관리합니다.</p>
     </div>
-    <button class="btn btn-outline-secondary" @onclick="LoadActiveAsync" disabled="@busy">Refresh</button>
+    <button class="btn btn-outline-secondary" @onclick="LoadActiveAsync" disabled="@busy">새로고침</button>
 </section>
 
 <section class="ops-grid">
     <div class="ops-panel">
         <div class="panel-heading">
-            <h2>Active Snapshot</h2>
-            <span class="status @(active is null ? "status-empty" : "status-live")">@(active is null ? "Empty" : "Live")</span>
+            <h2>활성 스냅샷</h2>
+            <span class="status @(active is null ? "status-empty" : "status-live")">@(active is null ? "없음" : "활성")</span>
         </div>
 
         @if (active is null)
         {
-            <p class="muted">No active content snapshot has been published.</p>
+            <p class="muted">배포된 활성 콘텐츠 스냅샷이 없습니다.</p>
         }
         else
         {
             <dl class="snapshot-list">
-                <dt>Version</dt>
+                <dt>버전</dt>
                 <dd>@active.Version</dd>
-                <dt>Checksum</dt>
+                <dt>체크섬</dt>
                 <dd class="mono">@active.Checksum</dd>
-                <dt>Published</dt>
+                <dt>배포 시각</dt>
                 <dd>@active.PublishedAtUtc.ToString("u")</dd>
-                <dt>Banners</dt>
+                <dt>배너 수</dt>
                 <dd>@active.GachaBanners.Count</dd>
             </dl>
 
-            <table class="ops-table">
-                <thead>
-                    <tr>
-                        <th>Banner</th>
-                        <th>Cost</th>
-                        <th>Pity</th>
-                        <th>Pool</th>
-                        <th>Window</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var banner in active.GachaBanners)
-                    {
+            <div class="table-scroll">
+                <table class="ops-table content-table">
+                    <thead>
                         <tr>
-                            <td>@banner.BannerId</td>
-                            <td>@banner.CostAmount @banner.CostCurrency</td>
-                            <td>@banner.PityThreshold</td>
-                            <td>@banner.RewardPool.Count rewards / @banner.RewardPool.Sum(entry => entry.Weight) weight</td>
-                            <td>@banner.StartsAtUtc.ToString("MM-dd HH:mm") - @banner.EndsAtUtc.ToString("MM-dd HH:mm") UTC</td>
+                            <th>배너</th>
+                            <th>비용</th>
+                            <th>천장</th>
+                            <th>보상 풀</th>
+                            <th>기간</th>
                         </tr>
-                    }
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        @foreach (var banner in active.GachaBanners)
+                        {
+                            <tr>
+                                <td>@banner.BannerId</td>
+                                <td>@banner.CostAmount @banner.CostCurrency</td>
+                                <td>@banner.PityThreshold</td>
+                                <td>보상 @(banner.RewardPool.Count)개 / 가중치 @banner.RewardPool.Sum(entry => entry.Weight)</td>
+                                <td>@banner.StartsAtUtc.ToString("MM-dd HH:mm") - @banner.EndsAtUtc.ToString("MM-dd HH:mm") UTC</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
         }
     </div>
 
     <div class="ops-panel">
         <div class="panel-heading">
-            <h2>Publish Draft</h2>
-            <span class="status status-draft">Draft</span>
+            <h2>배포 초안</h2>
+            <span class="status status-draft">초안</span>
         </div>
 
         <div class="form-grid">
             <label>
-                Version
+                버전
                 <input class="form-control" @bind="draft.Version" />
             </label>
             <label>
-                Banner ID
+                배너 ID
                 <input class="form-control" @bind="draft.BannerId" />
             </label>
             <label>
-                Cost
+                비용
                 <input class="form-control" type="number" @bind="draft.CostAmount" />
             </label>
             <label>
-                Pity
+                천장 기준
                 <input class="form-control" type="number" @bind="draft.PityThreshold" />
             </label>
             <label>
-                Standard character
+                일반 캐릭터
                 <input class="form-control" @bind="draft.StandardCharacterId" />
             </label>
             <label>
-                Standard weight
+                일반 가중치
                 <input class="form-control" type="number" @bind="draft.StandardWeight" />
             </label>
             <label>
-                Pickup character
+                픽업 캐릭터
                 <input class="form-control" @bind="draft.PickupCharacterId" />
             </label>
             <label>
-                Pickup weight
+                픽업 가중치
                 <input class="form-control" type="number" @bind="draft.PickupWeight" />
             </label>
             <label>
-                Starts UTC
+                시작 시각(UTC)
                 <input class="form-control" @bind="draft.StartsAtUtc" />
             </label>
             <label>
-                Ends UTC
+                종료 시각(UTC)
                 <input class="form-control" @bind="draft.EndsAtUtc" />
             </label>
         </div>
 
         <label class="block-label">
-            Operation reason
+            작업 사유
             <input class="form-control" @bind="draft.Reason" />
         </label>
 
         <div class="button-row">
             <AuthorizeView Roles="LiveOpsOperator,LiveOpsSupervisor">
-                <button class="btn btn-primary" @onclick="PublishAsync" disabled="@busy">Publish</button>
+                <button class="btn btn-primary" @onclick="PublishAsync" disabled="@busy">배포</button>
             </AuthorizeView>
-            <button class="btn btn-outline-secondary" @onclick="ResetDraft" disabled="@busy">Reset</button>
+            <button class="btn btn-outline-secondary" @onclick="ResetDraft" disabled="@busy">초기화</button>
         </div>
     </div>
 </section>
 
 <section class="ops-panel">
     <div class="panel-heading">
-        <h2>Rollback</h2>
-        <span class="status status-warning">Control plane</span>
+        <h2>롤백</h2>
+        <span class="status status-warning">운영 제어</span>
     </div>
     <div class="rollback-row">
-        <input class="form-control" placeholder="version to rollback" @bind="rollbackVersion" />
-        <input class="form-control" placeholder="rollback reason" @bind="rollbackReason" />
+        <input class="form-control" placeholder="롤백할 버전" @bind="rollbackVersion" />
+        <input class="form-control" placeholder="롤백 사유" @bind="rollbackReason" />
         <AuthorizeView Roles="LiveOpsSupervisor">
-            <button class="btn btn-outline-danger" @onclick="RollbackAsync" disabled="@busy">Rollback</button>
+            <button class="btn btn-outline-danger" @onclick="RollbackAsync" disabled="@busy">롤백</button>
         </AuthorizeView>
     </div>
 </section>
@@ -165,7 +167,7 @@
     private bool busy;
     private string? message;
     private string rollbackVersion = "";
-    private string rollbackReason = "incident-response";
+    private string rollbackReason = "장애 대응";
     private DraftContentModel draft = DraftContentModel.CreateDefault();
 
     protected override async Task OnInitializedAsync()
@@ -178,7 +180,7 @@
         await RunAsync(async () =>
         {
             active = await ApiClient.GetActiveAsync();
-            message = active is null ? "No active snapshot." : $"Loaded active version {active.Version}.";
+            message = active is null ? "활성 스냅샷이 없습니다." : $"활성 버전을 불러왔습니다: {active.Version}";
         });
     }
 
@@ -189,13 +191,13 @@
             if (!TryBuildPublishCommand(out var command, out var error))
             {
                 lastResult = new ContentPublishResult(false, null, [new ContentValidationIssue("admin.form.invalid", error)]);
-                message = "Draft is invalid.";
+                message = "초안 입력값을 확인하세요.";
                 return;
             }
 
             lastResult = await ApiClient.PublishAsync(command);
             active = lastResult.Snapshot ?? active;
-            message = lastResult.Published ? $"Published {lastResult.Snapshot!.Version}." : "Publish rejected.";
+            message = lastResult.Published ? $"콘텐츠 버전을 배포했습니다: {lastResult.Snapshot!.Version}" : "배포가 거부되었습니다.";
         });
     }
 
@@ -205,7 +207,7 @@
         {
             lastResult = await ApiClient.RollbackAsync(rollbackVersion, rollbackReason);
             active = lastResult.Snapshot ?? active;
-            message = lastResult.Published ? $"Rolled back to {lastResult.Snapshot!.Version}." : "Rollback rejected.";
+            message = lastResult.Published ? $"콘텐츠 버전으로 롤백했습니다: {lastResult.Snapshot!.Version}" : "롤백이 거부되었습니다.";
         });
     }
 
@@ -220,7 +222,7 @@
         catch (HttpRequestException ex)
         {
             lastResult = new ContentPublishResult(false, null, [new ContentValidationIssue("api.unreachable", ex.Message)]);
-            message = "API request failed.";
+            message = "API 요청에 실패했습니다.";
         }
         finally
         {
@@ -235,13 +237,13 @@
 
         if (!DateTimeOffset.TryParse(draft.StartsAtUtc, out var startsAt))
         {
-            error = "Starts UTC is not a valid timestamp.";
+            error = "시작 시각(UTC)의 형식이 올바르지 않습니다.";
             return false;
         }
 
         if (!DateTimeOffset.TryParse(draft.EndsAtUtc, out var endsAt))
         {
-            error = "Ends UTC is not a valid timestamp.";
+            error = "종료 시각(UTC)의 형식이 올바르지 않습니다.";
             return false;
         }
 
@@ -324,7 +326,7 @@
                 PickupWeight = 300,
                 StartsAtUtc = now.AddMinutes(-5).ToString("u"),
                 EndsAtUtc = now.AddDays(7).ToString("u"),
-                Reason = "scheduled-content-publish"
+                Reason = "정기 콘텐츠 배포"
             };
         }
     }

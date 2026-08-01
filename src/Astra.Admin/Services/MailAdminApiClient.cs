@@ -16,7 +16,7 @@ public sealed class MailAdminApiClient(AdminApiHttpClient httpClient)
             cancellationToken);
         await AdminApiHttpClient.EnsureSuccessAsync(response, cancellationToken);
         return await response.Content.ReadFromJsonAsync<MailDefinitionDto>(cancellationToken)
-            ?? throw new InvalidOperationException("API returned an empty mail definition.");
+            ?? throw new InvalidOperationException("API가 빈 우편 정의를 반환했습니다.");
     }
 
     public async Task<MailDefinitionDto?> GetMailAsync(
@@ -62,7 +62,7 @@ public sealed class MailAdminApiClient(AdminApiHttpClient httpClient)
             cancellationToken);
         await AdminApiHttpClient.EnsureSuccessAsync(response, cancellationToken);
         return await response.Content.ReadFromJsonAsync<PlayerCommandReceipt>(cancellationToken)
-            ?? throw new InvalidOperationException("API returned an empty claim receipt.");
+            ?? throw new InvalidOperationException("API가 빈 수령 결과를 반환했습니다.");
     }
 }
 

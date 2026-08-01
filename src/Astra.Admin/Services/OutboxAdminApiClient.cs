@@ -14,7 +14,7 @@ public sealed class OutboxAdminApiClient(AdminApiHttpClient httpClient)
             cancellationToken);
         await AdminApiHttpClient.EnsureSuccessAsync(response, cancellationToken);
         return await response.Content.ReadFromJsonAsync<OutboxOverviewDto>(cancellationToken)
-            ?? throw new InvalidOperationException("Outbox overview response was empty.");
+            ?? throw new InvalidOperationException("Outbox 요약 응답이 비어 있습니다.");
     }
 
     public async Task<IReadOnlyList<OutboxDeadLetterDto>> GetDeadLettersAsync(
@@ -41,6 +41,6 @@ public sealed class OutboxAdminApiClient(AdminApiHttpClient httpClient)
             cancellationToken);
         await AdminApiHttpClient.EnsureSuccessAsync(response, cancellationToken);
         return await response.Content.ReadFromJsonAsync<OutboxReplayResultDto>(cancellationToken)
-            ?? throw new InvalidOperationException("Outbox replay response was empty.");
+            ?? throw new InvalidOperationException("Outbox 재처리 응답이 비어 있습니다.");
     }
 }

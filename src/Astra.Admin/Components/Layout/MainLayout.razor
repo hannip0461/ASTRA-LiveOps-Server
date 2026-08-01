@@ -11,11 +11,11 @@
                 <Authorized>
                     <div class="operator-identity">
                         <strong>@authentication.User.Identity?.Name</strong>
-                        <span>@authentication.User.FindFirst(ClaimTypes.Role)?.Value</span>
+                        <span>@RoleLabel(authentication.User.FindFirst(ClaimTypes.Role)?.Value)</span>
                     </div>
                     <form method="post" action="/auth/sign-out">
                         <AntiforgeryToken />
-                        <button class="btn btn-sm btn-outline-secondary" type="submit">Sign out</button>
+                        <button class="btn btn-sm btn-outline-secondary" type="submit">로그아웃</button>
                     </form>
                 </Authorized>
             </AuthorizeView>
@@ -27,7 +27,17 @@
 </div>
 
 <div id="blazor-error-ui" data-nosnippet>
-    An unhandled error has occurred.
-    <a href="." class="reload">Reload</a>
-    <span class="dismiss">🗙</span>
+    처리 중 오류가 발생했습니다.
+    <a href="." class="reload">새로고침</a>
+    <span class="dismiss" title="닫기">🗙</span>
 </div>
+
+@code {
+    private static string RoleLabel(string? role) => role switch
+    {
+        "LiveOpsViewer" => "조회자",
+        "LiveOpsOperator" => "운영자",
+        "LiveOpsSupervisor" => "책임자",
+        _ => role ?? ""
+    };
+}

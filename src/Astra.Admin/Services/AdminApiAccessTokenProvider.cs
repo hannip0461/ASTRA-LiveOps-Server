@@ -60,7 +60,7 @@ public sealed class AdminApiHttpClient(
                         ? problem.Title
                         : problem.Detail;
                 throw new HttpRequestException(
-                    $"{problem.Code ?? "api_error"}: {message ?? "API request failed."}",
+                    $"{problem.Code ?? "api_error"}: {message ?? "API 요청에 실패했습니다."}",
                     null,
                     response.StatusCode);
             }

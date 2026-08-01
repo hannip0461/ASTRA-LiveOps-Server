@@ -5,43 +5,43 @@
 @attribute [Authorize]
 @inject OutboxAdminApiClient ApiClient
 
-<PageTitle>Outbox Operations</PageTitle>
+<PageTitle>Outbox 운영</PageTitle>
 
 <section class="ops-header">
     <div>
-        <p class="eyebrow">Delivery Operations</p>
-        <h1>Transactional outbox</h1>
-        <p class="muted">Review delivery backlog and terminal failures.</p>
+        <p class="eyebrow">이벤트 전달</p>
+        <h1>Outbox 전달 현황</h1>
+        <p class="muted">비동기 전달 대기열과 최종 실패 이벤트를 확인합니다.</p>
     </div>
-    <button class="btn btn-outline-secondary" @onclick="LoadAsync" disabled="@busy">Refresh</button>
+    <button class="btn btn-outline-secondary" @onclick="LoadAsync" disabled="@busy">새로고침</button>
 </section>
 
 @if (overview is not null)
 {
-    <section class="outbox-summary" aria-label="Outbox status summary">
-        <div><span>Pending</span><strong>@overview.PendingCount</strong></div>
-        <div><span>Processing</span><strong>@overview.ProcessingCount</strong></div>
-        <div><span>Published</span><strong>@overview.PublishedCount</strong></div>
-        <div class="@(overview.DeadLetterCount > 0 ? "metric-alert" : null)"><span>Dead letter</span><strong>@overview.DeadLetterCount</strong></div>
-        <div><span>Delivered</span><strong>@overview.DeliveryCount</strong></div>
-        <div><span>Oldest pending</span><strong>@FormatAge(overview.OldestPendingAtUtc)</strong></div>
+    <section class="outbox-summary" aria-label="Outbox 상태 요약">
+        <div><span>대기</span><strong>@overview.PendingCount</strong></div>
+        <div><span>처리 중</span><strong>@overview.ProcessingCount</strong></div>
+        <div><span>발행 완료</span><strong>@overview.PublishedCount</strong></div>
+        <div class="@(overview.DeadLetterCount > 0 ? "metric-alert" : null)"><span>최종 실패</span><strong>@overview.DeadLetterCount</strong></div>
+        <div><span>전달 완료</span><strong>@overview.DeliveryCount</strong></div>
+        <div><span>최장 대기</span><strong>@FormatAge(overview.OldestPendingAtUtc)</strong></div>
     </section>
 }
 
 <section class="ops-panel">
     <div class="panel-heading">
-        <h2>Dead-letter events</h2>
-        <span class="status @(deadLetters.Count > 0 ? "status-error" : "status-live")">@deadLetters.Count records</span>
+        <h2>최종 실패 이벤트</h2>
+        <span class="status @(deadLetters.Count > 0 ? "status-error" : "status-live")">@(deadLetters.Count)건</span>
     </div>
 
     <label class="block-label replay-reason">
-        Replay reason
-        <input class="form-control" maxlength="500" @bind="replayReason" placeholder="Required for Supervisor replay" />
+        재처리 사유
+        <input class="form-control" maxlength="500" @bind="replayReason" placeholder="책임자 재처리 시 필수" />
     </label>
 
     @if (deadLetters.Count == 0)
     {
-        <p class="muted compact">No dead-letter events found.</p>
+        <p class="muted compact">최종 실패 이벤트가 없습니다.</p>
     }
     else
     {
@@ -49,12 +49,12 @@
             <table class="ops-table outbox-table">
                 <thead>
                     <tr>
-                        <th>Failed</th>
-                        <th>Event</th>
-                        <th>Aggregate</th>
-                        <th>Error</th>
-                        <th>Attempts</th>
-                        <th>Replays</th>
+                        <th>실패 시각</th>
+                        <th>이벤트</th>
+                        <th>집계 ID</th>
+                        <th>오류</th>
+                        <th>시도</th>
+                        <th>재처리</th>
                         <th></th>
                     </tr>
                 </thead>
@@ -77,7 +77,7 @@
                                         <button class="btn btn-sm btn-outline-danger"
                                                 disabled="@(busy || string.IsNullOrWhiteSpace(replayReason))"
                                                 @onclick="() => ReplayAsync(entry.EventId)">
-                                            Replay
+                                            재처리
                                         </button>
                                     </Authorized>
                                 </AuthorizeView>
@@ -136,7 +136,7 @@
         {
             var result = await ApiClient.ReplayAsync(eventId, replayReason.Trim());
             isError = false;
-            message = $"Queued {result.EventId} for replay (manual replay #{result.ManualReplayCount}).";
+            message = $"이벤트를 재처리 대기열에 추가했습니다: {result.EventId} (수동 재처리 {result.ManualReplayCount}회)";
             replayReason = "";
             overview = await ApiClient.GetOverviewAsync();
             deadLetters = await ApiClient.GetDeadLettersAsync();
@@ -154,5 +154,5 @@
 
     private static string FormatAge(DateTimeOffset? oldestPending) => oldestPending is null
         ? "-"
-        : $"{Math.Max(0, (DateTimeOffset.UtcNow - oldestPending.Value).TotalSeconds):0}s";
+        : $"{Math.Max(0, (DateTimeOffset.UtcNow - oldestPending.Value).TotalSeconds):0}초";
 }

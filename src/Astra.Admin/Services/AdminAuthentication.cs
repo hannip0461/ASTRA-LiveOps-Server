@@ -71,7 +71,7 @@ public sealed class AdminSessionTokenStore(TimeProvider timeProvider)
         if (string.IsNullOrWhiteSpace(operatorId) || role is null)
         {
             throw new UnauthorizedAccessException(
-                "The identity provider did not issue a supported operator identity and role.");
+                "인증 공급자가 지원되는 운영자 ID와 역할을 발급하지 않았습니다.");
         }
 
         return Create(accessToken, expiresAtUtc, operatorId, role);
@@ -88,7 +88,7 @@ public sealed class AdminSessionTokenStore(TimeProvider timeProvider)
             string.IsNullOrWhiteSpace(operatorId) ||
             !LiveOpsRoles.All.Contains(role))
         {
-            throw new InvalidOperationException("Cannot create an Admin session from an invalid API token.");
+            throw new InvalidOperationException("유효하지 않은 API token으로 Admin session을 생성할 수 없습니다.");
         }
 
         RemoveExpired();
@@ -96,7 +96,7 @@ public sealed class AdminSessionTokenStore(TimeProvider timeProvider)
         var token = new AdminApiSessionToken(accessToken, expiresAtUtc, operatorId, role);
         if (!_tokens.TryAdd(sessionId, token))
         {
-            throw new InvalidOperationException("Failed to allocate a unique Admin session.");
+            throw new InvalidOperationException("고유한 Admin session을 할당하지 못했습니다.");
         }
 
         return sessionId;
@@ -106,7 +106,7 @@ public sealed class AdminSessionTokenStore(TimeProvider timeProvider)
     {
         if (principal.Identity?.IsAuthenticated != true || !HasRequiredRole(principal, requiredRole))
         {
-            throw new UnauthorizedAccessException("The Admin session lacks the required role.");
+            throw new UnauthorizedAccessException("Admin session에 필요한 역할이 없습니다.");
         }
 
         var sessionId = principal.FindFirst(SessionIdClaim)?.Value;
@@ -123,7 +123,7 @@ public sealed class AdminSessionTokenStore(TimeProvider timeProvider)
                 _tokens.TryRemove(sessionId, out _);
             }
 
-            throw new UnauthorizedAccessException("The Admin session is missing, expired, or inconsistent.");
+            throw new UnauthorizedAccessException("Admin session이 없거나 만료됐거나 일치하지 않습니다.");
         }
 
         return token.AccessToken;
@@ -199,7 +199,7 @@ public sealed class DevAdminAuthenticator(
     {
         if (!options.DevOperatorIds.Contains(operatorId, StringComparer.Ordinal))
         {
-            throw new UnauthorizedAccessException("The development operator is not configured for Admin sign-in.");
+            throw new UnauthorizedAccessException("Admin 로그인에 사용할 개발 운영자가 설정되지 않았습니다.");
         }
 
         using var request = new HttpRequestMessage(HttpMethod.Post, "/api/dev/auth/token")
@@ -212,11 +212,11 @@ public sealed class DevAdminAuthenticator(
         using var response = await client.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
         var token = await response.Content.ReadFromJsonAsync<DevOperatorTokenResponse>(cancellationToken)
-            ?? throw new InvalidOperationException("API returned an empty development token.");
+            ?? throw new InvalidOperationException("API가 빈 개발용 token을 반환했습니다.");
         if (!StringComparer.Ordinal.Equals(token.OperatorId, operatorId) ||
             !LiveOpsRoles.All.Contains(token.Role))
         {
-            throw new InvalidOperationException("API token identity does not match the sign-in request.");
+            throw new InvalidOperationException("API token의 사용자 정보가 로그인 요청과 일치하지 않습니다.");
         }
 
         return token;
@@ -404,7 +404,7 @@ public static class AdminAuthentication
         var properties = context.Properties;
         if (properties is null || context.Principal?.Identity is not ClaimsIdentity identity)
         {
-            context.Fail("The identity provider response did not contain a usable API token.");
+            context.Fail("인증 공급자 응답에 사용할 수 있는 API token이 없습니다.");
             return Task.CompletedTask;
         }
 
@@ -418,7 +418,7 @@ public static class AdminAuthentication
                 DateTimeStyles.RoundtripKind,
                 out var expiresAtUtc))
         {
-            context.Fail("The identity provider response did not contain a usable API token.");
+            context.Fail("인증 공급자 응답에 사용할 수 있는 API token이 없습니다.");
             return Task.CompletedTask;
         }
 
@@ -491,7 +491,7 @@ public static class AdminAuthentication
         if (options.DevSignInEnabled && options.OpenIdConnect.Enabled)
         {
             throw new InvalidOperationException(
-                "Development Admin sign-in and OpenID Connect cannot be enabled together.");
+                "개발용 Admin 로그인과 OpenID Connect를 동시에 활성화할 수 없습니다.");
         }
 
         if (options.OpenIdConnect.Enabled)
@@ -512,7 +512,7 @@ public static class AdminAuthentication
                 string.IsNullOrWhiteSpace(configured.RoleClaimType))
             {
                 throw new InvalidOperationException(
-                    "Astra:UiAuth OpenID Connect configuration is invalid.");
+                    "Astra:UiAuth OpenID Connect 설정이 올바르지 않습니다.");
             }
 
             return;
@@ -525,7 +525,7 @@ public static class AdminAuthentication
 
         if (!environment.IsDevelopment())
         {
-            throw new InvalidOperationException("Development Admin sign-in can run only in Development.");
+            throw new InvalidOperationException("개발용 Admin 로그인은 Development 환경에서만 사용할 수 있습니다.");
         }
 
         if (Encoding.UTF8.GetByteCount(options.DevTokenKey) < 32 ||
@@ -533,7 +533,7 @@ public static class AdminAuthentication
             options.DevOperatorIds.Any(string.IsNullOrWhiteSpace) ||
             options.DevOperatorIds.Distinct(StringComparer.Ordinal).Count() != options.DevOperatorIds.Count)
         {
-            throw new InvalidOperationException("Astra:UiAuth development sign-in configuration is invalid.");
+            throw new InvalidOperationException("Astra:UiAuth 개발용 로그인 설정이 올바르지 않습니다.");
         }
     }
 }
