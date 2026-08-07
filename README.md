@@ -1,6 +1,6 @@
 # ASTRA LiveOps Server
 
-.NET 10과 Microsoft Orleans로 구현한 수집형 RPG LiveOps 서버입니다. 네트워크 재시도와 동시 요청에서도 가챠·재화·천장 상태를 일관되게 유지하고, 콘텐츠 배포 사고의 추적·롤백·대상자 보상까지 운영 화면과 장애 테스트로 검증합니다.
+.NET 10과 Microsoft Orleans로 구현한 수집형 RPG LiveOps 서버입니다. 네트워크 재시도와 동시 요청에서도 가챠, 재화, 천장 상태를 일관되게 유지하고, 콘텐츠 배포 사고의 추적, 롤백, 대상자 보상까지 운영 화면과 장애 테스트로 검증합니다.
 
 [![CI](https://github.com/hannip0461/ASTRA-LiveOps-Server/actions/workflows/ci.yml/badge.svg)](https://github.com/hannip0461/ASTRA-LiveOps-Server/actions/workflows/ci.yml)
 
@@ -14,7 +14,7 @@
 
 ## 프로젝트 개요
 
-수집형 RPG에서는 네트워크 재시도, 동시 명령과 콘텐츠 운영 실수가 재화·보상 오류로 이어질 수 있습니다. ASTRA는 플레이어별 명령 직렬화, PostgreSQL 원자적 트랜잭션과 운영 복구 절차를 하나의 실행 가능한 서버로 구성합니다.
+수집형 RPG에서는 네트워크 재시도, 동시 명령과 콘텐츠 운영 실수가 재화와 보상 오류로 이어질 수 있습니다. ASTRA는 플레이어별 명령 직렬화, PostgreSQL 원자적 트랜잭션과 운영 복구 절차를 하나의 실행 가능한 서버로 구성합니다.
 
 | 영역 | 구현 결과 |
 |---|---|
@@ -67,7 +67,7 @@
 | Redis | 사고 보상 대상 membership과 짧은 TTL 조회 가속 |
 | Blazor Admin | 콘텐츠 배포 및 롤백, 사고 보상 우편, 감사 로그와 Outbox 운영 |
 | Worker | Outbox lease/retry/dead-letter와 retention cleanup |
-| OpenTelemetry / Elastic | API, TCP, Grain, DB와 Worker trace·metric·alert |
+| OpenTelemetry / Elastic | API, TCP, Grain, DB와 Worker trace, metric, alert |
 
 ## 구현 상세
 
@@ -85,7 +85,7 @@
 - Silo-local ActiveContentCache, PostgreSQL LISTEN/NOTIFY와 주기적 reconciliation
 - 사고 영향 대상 snapshot, Redis membership cache와 PostgreSQL fallback
 - 멱등 Incident Mail claim과 운영 audit trail
-- Blazor 기반 콘텐츠·보상·감사·Outbox 운영 화면
+- Blazor 기반 콘텐츠, 보상, 감사, Outbox 운영 화면
 
 ### 통신과 보안
 
